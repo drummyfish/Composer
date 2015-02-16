@@ -1,0 +1,71 @@
+composition
+  {
+    tempo:
+  }
+
+orchestral: composition
+  {
+  }
+
+rock: composition
+  {
+    electric-guitar: const yes
+
+  }
+
+rock_intro: rock
+  {
+  }
+
+rock_chorus: rock
+  {
+  }
+
+rock_verse: rock
+  {
+  }
+
+rock_bridge: rock
+  {
+  }
+
+rock_outro: rock
+  {
+  }
+
+metal: composition
+  {
+  }
+
+pop: composition
+  {
+  }
+
+pop_verse: pop
+  {
+  }
+
+pop_chorus: pop
+  {
+  }
+
+pop_bridge: pop
+  {
+  }
+
+------------------------------------------------------------------------
+
+orchestral:
+
+
+
+rock:
+  intensity = uniform(2,5)
+  instruments = []
+
+  rock_intro (rock_verse rock_chorus{intensity})[1 - 3] rock_bridge rock_chorus{intensity + 1} (rock_outro)[0 - 1]
+
+rock2:
+
+pop:
+

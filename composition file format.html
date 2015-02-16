@@ -1,0 +1,845 @@
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+    <style>
+      .code
+        {
+          font-family: 'Lucida Console', monospace;
+        }
+
+      .descriptive
+        {
+          color: grey;
+        }
+    </style>
+  </head>
+
+  <body>
+    <h1> Composition description file format </h1>
+
+    <span> Miloslav Číž, 2015 </span>
+
+    <h2> Table of content </h2>
+
+    <ul>
+      <li> <a href="#basic_file_structure"> Basic file structure </a> </li>
+      <li> <a href="#comments"> Comments </a> </li>
+      <li> <a href="#section_definitions"> Section definitions </a> <br />
+        <ul>
+          <li> <a href="#parameter_values"> Parameter values </a> </li>
+          <li> <a href="#inheritance"> Inheritance </a> </li>
+          <li> <a href="#parameter_specifications"> Parameter specifications </a> </li>
+        </ul>
+      </li>
+      <li> <a href="#structure_definitions"> Structure definitions </a> </li>
+    </ul>
+
+    <h2 id="basic_file_structure" > Basic file structure </h2>
+
+    <p>
+      The coposition description is a text file format. It consists of
+      two main sections:
+    </p>
+
+    <ul>
+      <li>
+        section definitions - Describes various section that are later
+        used to form compositions. A section is a part of a composition,
+        such as rock chorus, pop verse etc.
+      </li>
+      <li>
+        structure definition - Describes various music genre composition
+        structures using previously defined sections with regular
+        expression-like strings.
+      </li>
+    </ul>
+
+    <p>
+      The basic file structure is therefore:
+    </p>
+
+    <p class="code">
+      sections: <br />
+      <span class="descriptive"> section definitions </span> <br />
+      structures: <br />
+      <span class="descriptive"> structure definitions </span> <br />
+    </p>
+
+    <h2 id="comments"> Comments </h2>
+
+    <p>
+      Any text beginning with '#' up to the end of line is considered
+      a comment and is not processed.
+    </p>
+
+    <h2 id="section_definitions"> Section definitions </h2>
+
+    <p>
+      Sections describe a part of a composition, such as rock chorus,
+      metal bridge, pop verse, rock intro etc. They use name-value
+      pair to give the composer program hints on how the section
+      should be composed. Note that all of these parameters are just
+      hint and may not always be fully satisfied.
+    </p>
+
+    <p>
+      A section structure in the file is:
+    </p>
+
+    <p class="code">
+    <span class="descriptive"> section_name </span> : <br />
+    { <br />
+    <span class="descriptive"> parameter_name </span> :
+    <span class="descriptive"> parameter_value </span> <br />
+    <span class="descriptive"> ... </span> <br />
+    } <br />
+    </p>
+
+    <p>
+      Any name-value pairs can be given, as they are just hints and will
+      be ignored if the composer program doesn't understand them (in
+      which case, however, it should let the user know about any
+      name-value pair it didn't understand). The name-pair values must
+      be separated by newlines.
+    </p>
+
+    <h3 id="parameter_values"> Parameter values </h3>
+
+    <p>
+      Parameter values are of string data type. Due to the fact that
+      parameters can be randomly generated, iherited etc., there is
+      a syntax that allows for more control of how this should be done.
+      This chapter defines the parameter value syntax and its semantics.
+    </p>
+
+    <p>
+      The simplest form of parameter value string is the value itself
+      which means that the specified parameter should always have the
+      value given. For example if we want a rock song to always have
+      a tempo of 120, we write:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: 120 <br />
+      } <br />
+    </p>
+
+    <p>
+      However, in most cases we want the tempo to be randomly generated,
+      let's say between 90 and 130. This can be done using the following
+      syntax:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: uniform(90,130) <br />
+      } <br />
+    </p>
+
+    <p>
+      All possible probability density functions are:
+    </p>
+
+    <ul>
+      <li>
+        uniform(from,to): Generates a random uniform integer value in
+        range &lt;from,to&gt; (including the value from and to).
+      </li>
+
+      <li>
+        normal(??,??): TODO
+      </li>
+
+      <li>
+        yes_no(percentage): Generates either "yes" string or "no"
+        string, the probability of generating "yes" is given by the
+        parameter that is an integer percentage value, for example.
+        yes_no(80) will generate "yes" with 80 % chance.
+      </li>
+
+      <li>
+        values(v1,p1,v2,p2,...,vn,pn): Generates one of n values
+        (v1,...,vn) with explicitly specified corresponding
+        probabilities (p1,...,pn). The probabilities are integer numbers
+        of percentages that must add up to 100, the last one (pn) may
+        be left out.
+      </li>
+
+      <li>
+        values_uniform(v1,v2,...vn): Generates one of n given values
+        with uniform probability distribution.
+      </li>
+    </ul>
+
+    <p>
+      Note that the functions cannot be nested (for. example
+      inform(unifor(0,5),10) is wrong).
+    </p>
+
+    <p>
+      This will cause the composer program to generate a uniform integer
+      value from range 90 to 130 (including) for the tempo parameter of
+      each rock section separately. That means if two rock sections
+      were generated, each one of both would have a tempo value from
+      this range, but the values would be possibly different, because
+      they would be generated independently.
+    </p>
+
+    <p>
+      To make all the rock sections have the same randomly generated
+      tempo value, use the <span>const</span> keyword:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: const uniform(90,130) <br />
+      } <br />
+    </p>
+
+    <p>
+      In this case all the generated rock sections will have the same
+      value of tempo, though randomly generated, so a whole rock
+      composition consisting of multiple rock sections will have the
+      same tempo.
+    </p>
+
+    <p>
+    </p>
+
+    <h3 id="inheritance"> Inheritance </h3>
+
+    <p>
+      Inheritance is an important mechanics that allows to create new
+      sections based on already existing ones, just like with classes in
+      object-oriented programming. To make a rock chorus section based
+      on general rock section, write:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: const uniform(90,130) <br />
+        &nbsp; signature: 4/4 <br />
+      } <br /> <br />
+
+      rock_chorus: rock <br />
+      { <br />
+      } <br />
+    </p>
+
+    <p>
+      The rock chorus section will inherit all the values of its parent,
+      i.e. the rock section, if not specified otherwise. To override
+      a parameter value, for example the tempo, just specify it
+      explicitly:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: const uniform(90,130) <br />
+        &nbsp; signature: 4/4 <br />
+      } <br /> <br />
+
+      rock_chorus: rock <br />
+      { <br />
+        &nbsp; tempo: 140 <br />
+      } <br />
+    </p>
+
+    <p>
+      Now the rock chorus section will inherit the signature parameter,
+      but not the tempo, as it was overriden. Aparrently, we would like
+      the rock chorus to have faster tempo than the general rock
+      section, but we don't know what the tempo value of the rock
+      section will be, as it is to be generated randomly. It may happen,
+      that a value of 90 will be generated for the rock section and the
+      rock chorus will have its 140 value, which would make too big a
+      difference. To solve this, we can write:
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: const uniform(90,130) <br />
+        &nbsp; signature: 4/4 <br />
+      } <br /> <br />
+
+      rock_chorus: rock <br />
+      { <br />
+        &nbsp; tempo: inherit + 10 <br />
+      } <br />
+    </p>
+
+    <p>
+      This way the constant generated value will be inherited for the
+      rock chorus section, but 10 will be added to it, so if for
+      example 90 is generated for the rock section, the rock chorus
+      section will be assigned a value of 100. It is also possible to
+      use the followind syntactical constructions:
+    </p>
+
+    <p class="code">
+
+      rock_chorus: rock <br />
+      { <br />
+      &nbsp; <span class="descriptive"> a) </span> tempo: inherit + uniform(-10,10) <br />
+      &nbsp; <span class="descriptive"> or </span> <br />
+      &nbsp; <span class="descriptive"> b) </span> tempo: const inherit + uniform(-10,10) <br />
+      &nbsp; <span class="descriptive"> or </span> <br />
+      &nbsp; <span class="descriptive"> c) </span> tempo: inherit + const uniform(-10,10) <br />
+      } <br />
+    </p>
+
+    <p>
+      which have the following meanings:
+    </p>
+
+    <ol type="a">
+      <li>
+        The tempo attribute will be inherited and a random value in
+        given range, generated separately for each rock chorus section,
+        will be added to it. This way all rock sections will have
+        possibly different values.
+      </li>
+
+      <li>
+        The tempo value will be inherited and a random value in given
+        range will be added to it to form a value of <i>x</i>, which
+        will then be the same for all generated rock chorus sections.
+        This way all rock chorus sections will have the same tempo
+        value.
+      </li>
+
+      <li>
+        The tempo attribute will be inherited and a random value
+        <i>x</i> from given range will be generated for all rock chorus
+        sections and will be added to the inherited value. The value
+        <i>x</i> is not generated separately and will be the same for
+        all rock chorus sections. This way all rock sections will have
+        possibly different values.
+      </li>
+    </ol>
+
+    <p>
+      All possible operators are:
+    </p>
+
+    <ul>
+      <li> +: addition of integers </li>
+      <li> -: substraction of integers, not saturated </li>
+    </ul>
+
+    <p>
+      Also note that if we leave out the const keyword for the rock
+      section as follows
+    </p>
+
+    <p class="code">
+      rock <br />
+      { <br />
+        &nbsp; tempo: uniform(90,130) # 'const' left out <br />
+      } <br /> <br />
+
+      rock_chorus: rock <br />
+      { <br />
+        &nbsp; tempo: inherit # not necesarry to write this line <br />
+      } <br />
+    </p>
+
+    <p>
+      the meaning will be: for each generated rock chorus section
+      generate a random number of tempo separately, i.e. all rock
+      chorus sections will possibly have different tempo value.
+    </p>
+
+    <h3 id="parameter_specifications"> Parameter specifications </h3>
+
+    <p>
+      The following list defined all parameter names along with their
+      expected value formats that the composer program should understand
+      and take in account during composition generation.
+    </p>
+
+    <table>
+      <tr>
+        <th> parameter </th>
+        <th> meaning </th>
+        <th> expected value </th>
+        <th> default value </th>
+      </tr>
+
+      <tr>
+        <td>
+          tempo
+        </td>
+
+        <td>
+          section tempo in BPM (beats per minute)
+        </td>
+
+        <td>
+          an integer value, negative values are saturated to 1
+        </td>
+
+        <td>
+          const uniform(90,120)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          signature
+        </td>
+
+        <td>
+          section signature
+        </td>
+
+        <td>
+          'x/y' string, where x and y are whole non-zero integers,
+          for example 3/4, 4/4, 5/6
+        </td>
+
+        <td>
+          const values(4/4,90,3/4,10)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-piano
+        </td>
+
+        <td>
+          whether piano instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-guitar
+        </td>
+
+        <td>
+          whether guitar instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-drums
+        </td>
+
+        <td>
+          whether drums (classic drum set) instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-edrums
+        </td>
+
+        <td>
+          whether electronic drums instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-strings
+        </td>
+
+        <td>
+          whether strings instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-brass
+        </td>
+
+        <td>
+          whether brass instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-ebass
+        </td>
+
+        <td>
+          whether electric bass instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          instrument-eguitar
+        </td>
+
+        <td>
+          whether electric guitar instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          fullnes
+        </td>
+
+        <td>
+          how full the sound should be, i.e. how many different
+          frequencies should be occupied
+        </td>
+
+        <td>
+          0 to 100 integer value (including both), 0 being the least,
+          100 the most fullness
+        </td>
+
+        <td>
+          uniform(30,60)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          key
+        </td>
+
+        <td>
+          the section key
+        </td>
+
+        <td>
+          one of the following: C, D, E, F, G, A, B, Db, Eb, Gb, Ab, Bb
+        </td>
+
+        <td>
+          values_uniform(C,D,E,F,G,A,B,Db,Eb,Gb,Ab,Bb)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          transpose
+        </td>
+
+        <td>
+          how many semi-notes the section should be transposed
+          relatively to its key
+        </td>
+
+        <td>
+          integer value (even negative)
+        </td>
+
+        <td>
+          0
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          disharmony
+        </td>
+
+        <td>
+          how often off-key disharmonies should occure
+        </td>
+
+        <td>
+          0 to 100 integer value (including both), 0 being the least,
+          100 the most disharmonic
+        </td>
+
+        <td>
+          0
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          tempo-variability
+        </td>
+
+        <td>
+          how much the tempo should vary during the section (up or
+          down), 0 means the tempo will be always the same
+        </td>
+
+        <td>
+          non-negative integer
+        </td>
+
+        <td>
+          0
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          melodies
+        </td>
+
+        <td>
+          how many distinct melodies there should be
+        </td>
+
+        <td>
+          non-negative integer
+        </td>
+
+        <td>
+          1
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          length
+        </td>
+
+        <td>
+          section length in bars
+        </td>
+
+        <td>
+          positive integer
+        </td>
+
+        <td>
+          uniform(2,6)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          seed
+        </td>
+
+        <td>
+          specifies a seed for the section - sections with the same
+          seed will have the same musical pattern (actual notes) and
+          parameter values generated - the same values will only be
+          generated for parameters that have the same values defined.
+          specifying the section seed doesn't mean that the section will
+          always be the same in every composer program run, the actual
+          seed value used during computation is: section seed + user
+          defined seed for given program run
+        </td>
+
+        <td>
+          positive integer
+        </td>
+
+        <td>
+          uniform(0,65535)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          alter_patterns
+        </td>
+
+        <td>
+          says how much the musical patterns (actual notes generated)
+          should be altered after they have been generated, this is
+          useful in cases where there is multiple sections with the
+          same seed value: in this case all of them would be exactly
+          the same, while this parameter value can make them different;
+          the random pattern alternation will be computed with different
+          seed for each section, even if their seed values are the same.
+        </td>
+
+        <td>
+          integer number of percents, 0 means no alternation, 100 means
+          a lot of alternation
+        </td>
+
+        <td>
+          0
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          inacuraccies
+        </td>
+
+        <td>
+          affects number and intensity of small timing inacuraccies that
+          can make the song sound more human
+        </td>
+
+        <td>
+          integer number of percents, 0 means no inacuraccies, 100 means
+          many inacuraccies
+        </td>
+
+        <td>
+          0
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          smooth_transition
+        </td>
+
+        <td>
+          whether the section will transit smoothly to the next one
+          with its tempo, velocity etc., or whether the transition will
+          be instant
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          smooth_transition
+        </td>
+
+        <td>
+          whether the section will transit smoothly to the next one
+          with its tempo, velocity etc., or whether the transition will
+          be instant
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+    </table>
+
+  <h2 id="structure_definitions"> Structure definitions </h2>
+
+  <p>
+    Composition structions are defined in the second part of the file.
+    They define music genres, such as rock, pop, orchestral etc. For
+    each genre a regular-expression like string is specified, that say
+    what sections and in what order should be used. The string, just
+    as regular expressions, specifies a whole class of structures from
+    which one is randomly generated.
+  </p>
+
+  <p>
+    The composition structure (CS) string is defined as follows:
+  </p>
+
+  <ul>
+    <li> <span class="code descriptive"> section_name </span> is a CS. </li>
+    <li> <span class="code descriptive"> cs1 cs2 </span> is a CS, where cs1 and cs2 are CS's. </li>
+    <li> <span class="code"> <span class="descriptive">cs</span> [<span class="descriptive">quantity</span>] </span>
+      is a CS, where cs is a CS and quantity is a non-negative integer
+      that says how many times the cs will be repeated, it is possible
+      to use the random-number generator functions defined in
+      <a href="#parameter_values">parameter_values</a> section.
+    <li> <span class="code"> <span class="descriptive">cs1</span> | <span class="descriptive">cs2</span> | <span class="descriptive">...</span> </span> is a CS. </li>
+    <li> <span class="code"> (<span class="descriptive">cs</span>) </span> is a CS. </li>
+    <li> There are no other CS's. </li>
+  </ul>
+
+  <p>
+    For example consider the following CS:
+  </p>
+
+  <span class="code">
+    rock_intro[values(1,60,0)] (rock_verse, rock_chorus)[uniform(2,3)] (rock_bridge1 | rock_bridge2) rock_chorus rock_outro[values(1,50,0)]
+  </span>
+
+  <p>
+    This CS describes a simple rock song structure consisting of
+    optional rock intro section, that is present in 80 % of times, then
+    two or three verse-chorus pairs, one of two bridge types, a chorus
+    and an optional outro, that is present in 50 % of times.
+  </p>
+
+  </body>
+</html>

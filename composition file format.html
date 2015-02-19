@@ -816,12 +816,12 @@
   <ul>
     <li> <span class="code descriptive"> section_name </span> is a CS. </li>
     <li> <span class="code descriptive"> cs1 cs2 </span> is a CS, where cs1 and cs2 are CS's. </li>
-    <li> <span class="code"> <span class="descriptive">cs</span> [<span class="descriptive">quantity</span>] </span>
+    <li> <span class="code"> <span class="descriptive">cs</span> {<span class="descriptive">quantity</span>} </span>
       is a CS, where cs is a CS and quantity is a non-negative integer
       that says how many times the cs will be repeated, it is possible
       to use the random-number generator functions defined in
       <a href="#parameter_values">parameter_values</a> section.
-    <li> <span class="code"> <span class="descriptive">cs1</span> | <span class="descriptive">cs2</span> | <span class="descriptive">...</span> </span> is a CS. </li>
+    <li> <span class="code"> [ <span class="descriptive">cs1 cs2 ...</span> ] </span> is a CS. </li>
     <li> <span class="code"> (<span class="descriptive">cs</span>) </span> is a CS. </li>
     <li> There are no other CS's. </li>
   </ul>
@@ -831,7 +831,7 @@
   </p>
 
   <span class="code">
-    rock_intro[values(1,60,0)] (rock_verse, rock_chorus)[uniform(2,3)] (rock_bridge1 | rock_bridge2) rock_chorus rock_outro[values(1,50,0)]
+    rock_intro{values(1,60,0)} (rock_verse, rock_chorus){uniform(2,3)} [rock_bridge1 rock_bridge2] rock_chorus rock_outro{values(1,50,0)}
   </span>
 
   <p>

@@ -2,6 +2,7 @@ import re
 import random
 import itertools
 import collections
+import traceback
 
 # some MIDI instrument codes:
 
@@ -19,6 +20,62 @@ flatten = lambda *n: (e for a in n
 ## Serves for random generation of various things.
 
 class RandomGenerator:
+
+  ## Evaluates a build-in function for random value generation of the
+  #  composer file language and returns the generated value.
+  #
+  #  @param function_string a string representing the function and its
+  #         parameters, such as "uniform(0,10)"
+  #  @param seed seed that is used to generate the random values
+  #  @return the generated value represented as a string (even if it's
+  #          a number) or None if there was an error
+
+  def evaluate_function(self,function_string,seed):
+    try:
+      # remove the spaces
+      function_string = re.sub('\s*','',function_string)
+      position = function_string.find("(")
+      name = function_string[0:position]
+      parameters = function_string[position + 1:-1].split(",")
+
+      random.seed(seed)
+
+      if name == "uniform":
+        return str(random.randrange(int(parameters[0]),int(parameters[1]) + 1))
+      elif name == "values_uniform":
+        return random.choice(parameters)
+      elif name == "values":
+        calculate_last = False
+
+        if len(parameters) % 2 != 0:
+          parameters.append("0")
+          calculate_last = True
+
+        values = []
+        probabilities = []
+        probability_sum = 0
+
+        for i in range(0,len(parameters),2):
+          values.append(parameters[i])
+          probabilities.append(int(parameters[i + 1]))
+          probability_sum += probabilities[-1]
+
+        if calculate_last:
+          probabilities[-1] = 100 - probability_sum
+          probability_sum += probabilities[-1]
+
+        if probabilities[-1] < 0 or probability_sum != 100: # bad values
+          return None
+
+        print(values)
+        print(probabilities)
+
+        # TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+    except Exception:
+      print (traceback.format_exc())
+      return None
+
   ## Generates a composition structure (a sequence of section names) from
   #  composition structure string (a regular expression-like string, see
   #  the composition file format specification for details).
@@ -27,22 +84,26 @@ class RandomGenerator:
   #         file specification)
   #  @param seed integer random seed
   #  @return randomly generated composition structure as a list of
-  #          section names represented as strings
+  #          section names represented as strings or None if there was
+  #          an error parsing the string
 
   def generate_composition_structure(self, cs_string, seed):
-    # remove extra spaces:
-    cs_string = re.sub('\s+',' ',cs_string).lstrip().rstrip()
-    cs_string = re.sub('\s*\(\s*',' ( ',cs_string)
-    cs_string = re.sub('\s*\)\s*',' ) ',cs_string)
-    cs_string = re.sub('\s*\{\s*',' { ',cs_string)
-    cs_string = re.sub('\s*\}\s*',' } ',cs_string)
-    cs_string = re.sub('\s*\[\s*',' [ ',cs_string)
-    cs_string = re.sub('\s*\]\s*',' ] ',cs_string)
-    tokens = cs_string.split()
+    try:
+      # remove extra spaces:
+      cs_string = re.sub('\s+',' ',cs_string).lstrip().rstrip()
+      cs_string = re.sub('\s*\(\s*',' ( ',cs_string)
+      cs_string = re.sub('\s*\)\s*',' ) ',cs_string)
+      cs_string = re.sub('\s*\{\s*',' { ',cs_string)
+      cs_string = re.sub('\s*\}\s*',' } ',cs_string)
+      cs_string = re.sub('\s*\[\s*',' [ ',cs_string)
+      cs_string = re.sub('\s*\]\s*',' ] ',cs_string)
+      tokens = cs_string.split()
 
-    random.seed(seed)
+      random.seed(seed)
 
-    return self.__parse_composition_structure(tokens,seed)
+      return self.__parse_composition_structure(tokens,seed)
+    except Exception:
+      return None
 
   ## Private function that recursively parses the composition structure
   #  string.
@@ -287,5 +348,17 @@ class Composition:
 #print(instance)
 
 r = RandomGenerator()
-print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
+#print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
+
+histogram = [0] * 20
+
+for i in range(1000):
+  value = int(r.evaluate_function("  uniform (0,19) ",i))
+  histogram[value] += 1
+
+print(histogram)
+
+print(r.evaluate_function("values(abc,20,def) ",123))
+
+#print(r.evaluate_function("  uniform (0,10) ",123))

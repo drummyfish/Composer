@@ -44,6 +44,10 @@ class RandomGenerator:
         return str(random.randrange(int(parameters[0]),int(parameters[1]) + 1))
       elif name == "values_uniform":
         return random.choice(parameters)
+      elif name == "normal":
+        return str(int(random.normalvariate(int(parameters[0]),int(parameters[1]))))
+      elif name == "yes_no":
+        return "yes" if random.randrange(0,100) < int(parameters[0]) else "no"
       elif name == "values":
         calculate_last = False
 
@@ -67,10 +71,19 @@ class RandomGenerator:
         if probabilities[-1] < 0 or probability_sum != 100: # bad values
           return None
 
-        print(values)
-        print(probabilities)
+        random_value = random.randrange(0,100)
 
-        # TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+        probability_sum = 0
+        index = 0
+
+        for i in range(len(probabilities)):
+          probability_sum += probabilities[i]
+
+          if random_value < probability_sum:
+            index = i
+            break
+
+        return values[index]
 
     except Exception:
       print (traceback.format_exc())
@@ -351,14 +364,16 @@ r = RandomGenerator()
 #print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
 
-histogram = [0] * 20
+histogram = [0] * 200
 
 for i in range(1000):
-  value = int(r.evaluate_function("  uniform (0,19) ",i))
-  histogram[value] += 1
+  #value = int(r.evaluate_function("normal(100,15)",i))
+  #histogram[value] += 1
+  print(r.evaluate_function("values(a,33,b,33,c)",i))
 
-print(histogram)
+#for i in range(len(histogram)):
+  #print(str(i) + ": " + str(histogram[i]))
 
-print(r.evaluate_function("values(abc,20,def) ",123))
+#print(r.evaluate_function("values(abc,20,def) ",123))
 
 #print(r.evaluate_function("  uniform (0,10) ",123))

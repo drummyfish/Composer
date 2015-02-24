@@ -17,6 +17,8 @@ INSTRUMENT_STRINGS = 48
 flatten = lambda *n: (e for a in n
   for e in (flatten(*a) if isinstance(a, (tuple, list)) else (a,)))
 
+#=======================================================================
+
 ## Serves for random generation of various things.
 
 class RandomGenerator:
@@ -182,6 +184,82 @@ class RandomGenerator:
 
     return list(flatten(result))
 
+#=======================================================================
+
+## Represents a list of key-value pairs. Each parameter is stored in
+#  formt: name const1 value1 operator const2 value2.
+
+class ParameterList:
+  OPERATOR_PLUS = 0
+  OPERATOR_MINUS = 1
+
+  ## A class method that makes a parameter list with default values for
+  #  a section.
+  #
+  #  @return ParameterList object with default values initialised
+
+  def make_default_parameter_list():
+    result = ParameterList()
+
+    result.set_parameter("tempo",True,"uniform(90,120)")
+    result.set_parameter("signature",True,"values(4/4,90,3/4,10)")
+    result.set_parameter("instrument-piano",True,"no")
+
+    return result
+
+  def __init__(self):
+    self._parameter_dict = {}
+
+  ## Gets the parameter.
+  #
+  #  @name name of the parameter to be returned (string)
+  #  @return parameter as a list in format [const1 (bool), value1,
+  #          operator, const2 (bool), value2]
+
+  def get_parameter(self, name):
+    try:
+      return self._parameter_dict(name)
+    except Exception:
+      return None
+
+  ## Sets a parameter value.
+  #
+  #  @param name parameter name (string)
+  #  @param const1 whether value1 flag should be set to const (bool)
+  #  @param value1 first value (string or integer or None)
+  #  @param operator operator to be used between value1 and value2
+  #         (see the class constants), if None is set for the operator,
+  #         value2 will be ignored
+  #  @param const2 whether value2 flag should be set to const (bool)
+  #  @param value2 second value (string or integer or None)
+
+  def set_parameter(self, name, const1 = False, value1 = "inherit", operator = None, const2 = False, value2 = None):
+    self._parameter_dict[name] = [const1, value1, operator, const2, value2]
+
+  def __str__(self):
+    result = ""
+
+    for parameter_name in self._parameter_dict:
+      parameter = self._parameter_dict[parameter_name]
+      result += parameter_name + ": " + ("C " if parameter[0] else "")
+      result += "'" + str(parameter[1]) + "' "
+
+      if parameter[2] != None:
+        if parameter[2] == ParameterList.OPERATOR_PLUS:
+          result += "+ "
+        else:
+          result += "- "
+
+        result += ("C " if parameter[3] else "")
+
+        result += "'" + str(parameter[4]) + "'"
+
+      result += "\n"
+
+    return result
+
+#=======================================================================
+
 ## Represents a section, or more accurately a section definition
 #  (not a section instance), that can be loaded from the compositor
 #  file.
@@ -190,9 +268,101 @@ class Section:
   def init_attributes(self):
     ## section name
     self.name = ""
+    ## name of the parent section in inheritance context, None = no parent
+    self.parent_name = None
+    ## error explanation string, None = no error
+    self._error_string = None
+    ## stores parameter values
+    self.parameters = ParameterList()
 
   def __init__(self):
     self.init_attributes()
+
+  ## Gets an error explanation string that occured during the section
+  #  loading from string.
+  #
+  #  @return error explanation string or None if there was no error
+
+  def get_error_string(self):
+    return self._error_string
+
+  ## Initialises the section from given string (for the string format
+  #  see the composer file format reference).
+  #
+  #  @string section_string to read the section from
+
+  def load_from_string(self,section_string):
+    lines = section_string.split("\n")
+
+    pair = lines[0].split(":")
+
+    self.name = pair[0].rstrip().lstrip()
+
+    if len(pair) == 2:  # parent specified
+      self.parent_name = pair[1].rstrip().lstrip()
+
+    if lines[1].lstrip().rstrip() != "{":
+      self._error_string = "'{' expected"
+      return
+
+    for line in lines[2:]:
+      pair = line.split(":")
+
+      pair[0] = pair[0].lstrip().rstrip()
+
+      if len(pair) == 1 and pair[0] == "}":
+        return
+      elif len(pair) != 2:
+        self._error_string = "'wrong value-pair line: " + line
+        return
+
+      # parse the parameter value:
+      value_split = pair[1].split()
+
+      position = 0
+      const1 = False
+      const2 = False
+      operator = None
+      value1 = ""
+      value2 = None
+
+      try:
+        if value_split[position] == "const":
+          const1 = True
+          position += 1
+
+        value1 = value_split[position]
+
+        position += 1
+
+        if value_split[position] == "+":
+          operator = ParameterList.OPERATOR_PLUS
+          position += 1
+        elif value_split[position] == "-":
+          operator = ParameterList.OPERATOR_MINUS
+          position += 1
+
+        if value_split[position] == "const":
+          const2 = True
+          position += 1
+
+        value2 = value_split[position]
+      except Exception:
+         pass
+
+      self.parameters.set_parameter(pair[0],const1,value1,operator,const2,value2)
+
+    # if we get here, there was no '{'
+    self._error_string = "'}' expected"
+
+  def __str__(self):
+    result = "name: " + self.name + "\n"
+    result += "parent: " + str(self.parent_name) + "\n"
+    result += "parameters:\n"
+    result += str(self.parameters)
+    return result
+
+#=======================================================================
 
 ## Represents a section instance, i.e. a concrete section with its own
 #  parameter values and music pattern generated
@@ -206,6 +376,10 @@ class SectionInstance:
     self.tracks = []
     ## section length in bars
     self.length_bars = 4
+    ## how many beats are in one bar
+    self.beats_in_bar = 4
+    ## stores parameter values
+    self.parameters = ParameterList()
 
   def __init__(self):
     self.init_attributes()
@@ -226,6 +400,8 @@ class SectionInstance:
       result += str(track) + "\n"
 
     return result
+
+#=======================================================================
 
 ## Represents a musical note.
 
@@ -277,6 +453,8 @@ class Note:
       return "b"
     elif remainder == 11:
       return "B"
+
+#=======================================================================
 
 ## Represents a track used by a section. The track holds the music
 #  patern (notes) and an information about it such as its instrument.
@@ -332,6 +510,8 @@ class SectionTrack:
 
     return result
 
+#=======================================================================
+
 ## Represents a composition composed of ordered section instances.
 
 class Composition:
@@ -344,6 +524,8 @@ class Composition:
 
   def save_as_midi():
     return
+
+#=======================================================================
 
 #instance = SectionInstance()
 #track = SectionTrack()
@@ -360,16 +542,16 @@ class Composition:
 #instance.add_track(track2)
 #print(instance)
 
-r = RandomGenerator()
+#r = RandomGenerator()
 #print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
 
-histogram = [0] * 200
+#histogram = [0] * 200
 
-for i in range(1000):
+#for i in range(1000):
   #value = int(r.evaluate_function("normal(100,15)",i))
   #histogram[value] += 1
-  print(r.evaluate_function("values(a,33,b,33,c)",i))
+#  print(r.evaluate_function("values(a,33,b,33,c)",i))
 
 #for i in range(len(histogram)):
   #print(str(i) + ": " + str(histogram[i]))
@@ -377,3 +559,16 @@ for i in range(1000):
 #print(r.evaluate_function("values(abc,20,def) ",123))
 
 #print(r.evaluate_function("  uniform (0,10) ",123))
+
+sec_string = (" rock: rock_parent \n"
+              " {\n"
+              " tempot: 150 \n"
+              " instrument-guitar: yes_no(80)\n"
+              " aaa: const 150 + 140\n"
+              " bbb: inherit + const   uniform(50,20) \n"
+              " }\n")
+
+sec = Section()
+sec.load_from_string(sec_string)
+print(sec)
+

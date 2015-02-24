@@ -97,6 +97,11 @@
     </p>
 
     <p>
+      The newline separation must be exactly followed. The indentation
+      doesn't matter.
+    </p>
+
+    <p>
       Any name-value pairs can be given, as they are just hints and will
       be ignored if the composer program doesn't understand them (in
       which case, however, it should let the user know about any
@@ -433,6 +438,24 @@
 
       <tr>
         <td>
+          instrument-choir
+        </td>
+
+        <td>
+          whether choir instrument should be used
+        </td>
+
+        <td>
+          'yes' or 'no'
+        </td>
+
+        <td>
+          no
+        </td>
+      </tr>
+
+      <tr>
+        <td>
           instrument-guitar
         </td>
 
@@ -569,7 +592,8 @@
 
         <td>
           0 to 100 integer value (including both), 0 being the least,
-          100 the most fullness
+          100 the most fullness (the value will be saturated if out of
+          range)
         </td>
 
         <td>
@@ -625,7 +649,8 @@
 
         <td>
           0 to 100 integer value (including both), 0 being the least,
-          100 the most disharmonic
+          100 the most disharmonic (the value will be saturated if out
+          of range)
         </td>
 
         <td>
@@ -667,6 +692,46 @@
 
         <td>
           1
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          beat_speed
+        </td>
+
+        <td>
+          how fast the beat should (this doesn't affect the tempo but
+          rather how many notes will be generated), this affects not
+          only drums but all insruments
+        </td>
+
+        <td>
+          non-negative integer in range 0 to 100 (the value will be
+          saturated if out of range)
+        </td>
+
+        <td>
+          uniform(10,90)
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          hardness
+        </td>
+
+        <td>
+          how "hard" and loud the music should play
+        </td>
+
+        <td>
+          non-negative integer in range 0 to 100 (the value will be
+          saturated if out of range)
+        </td>
+
+        <td>
+          uniform(20,90)
         </td>
       </tr>
 
@@ -730,7 +795,8 @@
 
         <td>
           integer number of percents, 0 means no alternation, 100 means
-          a lot of alternation
+          a lot of alternation (the value will be saturated if out of
+          range)
         </td>
 
         <td>
@@ -750,7 +816,8 @@
 
         <td>
           integer number of percents, 0 means no inacuraccies, 100 means
-          many inacuraccies
+          many inacuraccies (the value will be saturated if out of
+          range)
         </td>
 
         <td>

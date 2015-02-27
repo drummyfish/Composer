@@ -11,6 +11,7 @@ INSTRUMENT_GUITRAR = 25
 INSTRUMENT_EBASS = 36
 INSTRUMENT_ROCK_DRUMS = 255    # not an actual MIDI code, this is an internal value
 INSTRUMENT_STRINGS = 48
+EVENT_TEMPO_CHANGE = 1000
 
 ## Flattens nested lists.
 
@@ -374,24 +375,81 @@ class SectionInstance:
     self.definition = None
     ## holds the section tracks with musical notes
     self.tracks = []
-    ## section length in bars
-    self.length_bars = 4
+    ## section length in beats
+    self.length_beats = 4
     ## how many beats are in one bar
     self.beats_in_bar = 4
     ## stores parameter values
     self.parameters = ParameterList()
+    ## stores meta events for the section such as tempo change, it is
+    #  a list of tuples (time in beats, event type, parameter)
+    self.meta_events = []
+
+  ## Converts a beat offset, i.e. a float type time in beats, to real time
+  #  in seconds, taking the tempo changes of the section into account.
+  #
+  #  @param beat_offset input value
+  #  @return converted value
+
+  def beat_offset_to_time_offset(self, beat_offset):
+    current_beat_offset = 0
+    previous_beat_offset = 0
+    current_event_event_index = 0
+    current_event_index = 0
+    accumulated_time = 0
+    current_tempo = 100        # default value
+
+    while True:
+      if current_event_index >= len(self.meta_events):
+        break
+
+      event = self.meta_events[current_event_index]
+      current_event_index += 1
+
+      if event[1] != EVENT_TEMPO_CHANGE:    # skip the events that aren't tempo change
+        continue
+
+      current_beat_offset = event[0]
+
+      if current_beat_offset >= beat_offset:
+        break
+
+      accumulated_time += (current_beat_offset - previous_beat_offset) * 60.0 / current_tempo
+
+      current_tempo = event[2]
+      previous_beat_offset = current_beat_offset
+
+    # now there is only a section between the last event and given beat offset
+
+    accumulated_time += (beat_offset - previous_beat_offset) * 60.0 / current_tempo
+
+    return accumulated_time
 
   def __init__(self):
     self.init_attributes()
+
+  ## Adds a meta event for the track such as a tempo change.
+  #
+  #  @param time time in beats (float)
+  #  @param event_type event type (int, see constants)
+  #  @param parameter parameter of the event such as the tempo value
+
+  def add_meta_event(self,time,event_type,parameter):
+    self.meta_events.append((time,event_type,parameter))
 
   ## Adds given track to the section.
   def add_track(self,track):
     self.tracks.append(track)
 
   def __str__(self):
-    result = "       "
+    result = "events: "
 
-    for i in range(self.length_bars):
+    for event in self.meta_events:
+      result += str(event) + ", "
+
+    result += "\n       "
+
+    for i in range(self.length_beats):
       result += "|..............."
 
     result += "\n"
@@ -407,9 +465,9 @@ class SectionInstance:
 
 class Note:
   def init_attributes(self):
-    ## on what time the note starts, the value is in bars (float)
+    ## on what time the note starts, the value is in beats (float)
     self.start = 0.0
-    ## duration of the note in bars (float)
+    ## duration of the note in beats (float)
     self.length = 0.25
     ## note "strength", integer 0 - 127
     self.velocity = 100
@@ -463,8 +521,8 @@ class SectionTrack:
   def init_attributes(self):
     ## track instrument
     self.instrument = INSTRUMENT_PIANO
-    ## track length in bars
-    self.length_bars = 4
+    ## track length in beats
+    self.length_beats = 4
     ## number of beats in a bar
     self.signature = 4
     ## list of Note objects representing a musical pattern of the track
@@ -494,7 +552,7 @@ class SectionTrack:
 
     i = 0
 
-    while i <= self.length_bars:
+    while i <= self.length_beats:
       nothing = True
 
       for note in self.notes:
@@ -522,6 +580,17 @@ class Composition:
   def __init__(self):
     self.init_attributes()
 
+  def add_section_instance(self,section_instance):
+    self.section_instances.append(section_instance)
+
+  def __str__(self):
+    result = ""
+
+    for section in self.section_instances:
+      result += str(section) + "\n\n"
+
+    return result
+
   def save_as_midi():
     return
 
@@ -546,29 +615,28 @@ class Composition:
 #print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
 
-#histogram = [0] * 200
+c = Composition()
+s = SectionInstance()
+t1 = SectionTrack()
+t2 = SectionTrack()
+t3 = SectionTrack()
+t4 = SectionTrack()
 
-#for i in range(1000):
-  #value = int(r.evaluate_function("normal(100,15)",i))
-  #histogram[value] += 1
-#  print(r.evaluate_function("values(a,33,b,33,c)",i))
+t1.add_note(Note(1.0,2.0,60,100))
+t1.add_note(Note(3.0,1.5,62,100))
+t2.add_note(Note(3.0,1.5,62,100))
+t2.add_note(Note(0.0,1,70,80))
+t3.add_note(Note(3.5,0.1,58,100))
 
-#for i in range(len(histogram)):
-  #print(str(i) + ": " + str(histogram[i]))
+s.add_track(t1)
+s.add_track(t2)
+s.add_track(t3)
+s.add_track(t4)
 
-#print(r.evaluate_function("values(abc,20,def) ",123))
+s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60);
 
-#print(r.evaluate_function("  uniform (0,10) ",123))
+c.add_section_instance(s)
 
-sec_string = (" rock: rock_parent \n"
-              " {\n"
-              " tempot: 150 \n"
-              " instrument-guitar: yes_no(80)\n"
-              " aaa: const 150 + 140\n"
-              " bbb: inherit + const   uniform(50,20) \n"
-              " }\n")
+print(c)
 
-sec = Section()
-sec.load_from_string(sec_string)
-print(sec)
-
+print(s.beat_offset_to_time_offset(3))

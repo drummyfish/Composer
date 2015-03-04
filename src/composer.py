@@ -13,6 +13,27 @@ INSTRUMENT_ROCK_DRUMS = 255    # not an actual MIDI code, this is an internal va
 INSTRUMENT_STRINGS = 48
 EVENT_TEMPO_CHANGE = 1000
 
+KEY_C_NOTES = [i * 12 for i in range(11)]                # contains all key codes for the C key
+KEY_C_NOTES += [i * 12 + 2 for i in range(11)]
+KEY_C_NOTES += [i * 12 + 4 for i in range(11)]
+KEY_C_NOTES += [i * 12 + 5 for i in range(11)]
+KEY_C_NOTES += [i * 12 + 7 for i in range(11)]
+KEY_C_NOTES += [i * 12 + 9 for i in range(11)]
+KEY_C_NOTES += [i * 12 + 11 for i in range(10)]
+KEY_C_NOTES.sort()
+
+KEY_DB_NOTES  = [i + 1 for i in KEY_C_NOTES]
+KEY_D_NOTES   = [i + 2 for i in KEY_C_NOTES]
+KEY_EB_NOTES  = [i + 3 for i in KEY_C_NOTES]
+KEY_E_NOTES   = [i + 4 for i in KEY_C_NOTES]
+KEY_F_NOTES   = [i + 5 for i in KEY_C_NOTES]
+KEY_GB_NOTES  = [i + 6 for i in KEY_C_NOTES]
+KEY_G_NOTES   = [i + 7 for i in KEY_C_NOTES]
+KEY_AB_NOTES  = [i + 8 for i in KEY_C_NOTES]
+KEY_A_NOTES   = [i + 9 for i in KEY_C_NOTES]
+KEY_BB_NOTES  = [i + 10 for i in KEY_C_NOTES]
+KEY_B_NOTES   = [i + 11 for i in KEY_C_NOTES]
+
 ## Flattens nested lists.
 
 flatten = lambda *n: (e for a in n
@@ -23,6 +44,35 @@ flatten = lambda *n: (e for a in n
 ## Serves for random generation of various things.
 
 class RandomGenerator:
+
+  ## Generates a random melody into given track of given section
+  #  instance.
+  #
+  #  @param section_instance SectionInstance object that holds a track
+  #         into which the melody will be generated
+  #  @param track_number number of track into which the melody will be
+  #         generated
+  #  @param key list of note codes, sets the melody key
+  #  @param seed random seed
+  #  @param base_note sets the base note around which the melody will be
+  #         built
+  #  @param offset_factor double in range <0,1>, says how much the note
+  #         pitch will be different between the generated notes, higher
+  #         number will generate a melody with higher pitch range
+  #  @param division_factor double in range <0,1>, affects how many
+  #         times the melody line will be split into two, bigger number
+  #         will produce a faster melody
+  #  @param disharmonies double in range <0,1>, says how many
+  #         disharmonies there will be
+
+  def generate_melody(self,section_instance,track_number,key,seed,base_note = 40,offset_factor = 0.3,division_factor = 0.4,disharmonies = 0.02):
+    random.seed(seed)
+
+    first_note = Note(0,section_instance.length_beats,Note.closest_note_value(base_note + random.randint(-15,15),key),100)
+
+    print(first_note)
+
+    return
 
   ## Evaluates a build-in function for random value generation of the
   #  composer file language and returns the generated value.
@@ -464,6 +514,26 @@ class SectionInstance:
 ## Represents a musical note.
 
 class Note:
+  ## Class method, gets a closest note value in given key to a given
+  #  value.
+  #
+  #  @param value note value
+  #  @param key key, a list of note values
+  #  @return integer note value that is the closest to given value and
+  #          is in given key
+
+  def closest_note_value(value, key):
+    if value in key:
+      return value
+
+    for i in range(100):
+      if value + i in key:
+        return value + i
+      elif value - i in key:
+        return value - i
+
+    return 0
+
   def init_attributes(self):
     ## on what time the note starts, the value is in beats (float)
     self.start = 0.0
@@ -474,8 +544,25 @@ class Note:
     ## MIDI note code (C3 = 60)
     self.note = 60
 
-  def __init__(self):
-    self.init_attributes()
+  ## Transposes the note respecting given key.
+  #
+  #  @param key key (the list of note values, see constants), the note
+  #         must be in this key, otherwise nothing happens
+  #  @param offset how many notes the note should be transposed,
+  #         can be positive or negative integer
+
+  def transpose(self,key,offset):
+    increment_by = 1 if offset >= 0 else -1
+    offset = abs(offset)
+
+    while offset > 0:
+      self.note += increment_by
+
+      if not self.note in key:
+        self.note += increment_by
+
+      offset -= 1
+    return
 
   def __init__(self, start, length, note, velocity):
     self.init_attributes()
@@ -611,7 +698,7 @@ class Composition:
 #instance.add_track(track2)
 #print(instance)
 
-#r = RandomGenerator()
+r = RandomGenerator()
 #print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
 
@@ -622,8 +709,6 @@ t2 = SectionTrack()
 t3 = SectionTrack()
 t4 = SectionTrack()
 
-t1.add_note(Note(1.0,2.0,60,100))
-t1.add_note(Note(3.0,1.5,62,100))
 t2.add_note(Note(3.0,1.5,62,100))
 t2.add_note(Note(0.0,1,70,80))
 t3.add_note(Note(3.5,0.1,58,100))
@@ -633,10 +718,10 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60);
+s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60)
 
 c.add_section_instance(s)
 
-print(c)
+r.generate_melody(s,0,KEY_C_NOTES,1100,40)
 
-print(s.beat_offset_to_time_offset(3))
+print(c)

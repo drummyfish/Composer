@@ -5,12 +5,15 @@ import collections
 import traceback
 from MidiFile3 import MIDIFile
 
-# some MIDI instrument codes:
+# instrument codes, these may not correspond to actual midi codes,
+# bacause these internal values include also a way to play the
+# instruments, so for example rock drums and metal drums may map to
+# the same MIDI instrument in the end
 
 INSTRUMENT_PIANO = 1
 INSTRUMENT_GUITAR = 25
 INSTRUMENT_EBASS = 36
-INSTRUMENT_ROCK_DRUMS = 255    # not an actual MIDI code, this is an internal value
+INSTRUMENT_ROCK_DRUMS = 255       # internal value
 INSTRUMENT_STRINGS = 48
 EVENT_TEMPO_CHANGE = 1000
 
@@ -39,6 +42,14 @@ KEY_B_NOTES   = [i + 11 for i in KEY_C_NOTES]
 
 flatten = lambda *n: (e for a in n
   for e in (flatten(*a) if isinstance(a, (tuple, list)) else (a,)))
+
+## Converts internal instrumen code to MIDI instrument code
+#
+#  @param instrument internal instrument value (see constants)
+#  @return mapped MIDI instrument code
+
+def instrument_to_midi(instrument):
+  return instrument
 
 #=======================================================================
 
@@ -69,11 +80,58 @@ class RandomGenerator:
   def generate_melody(self,section_instance,track_number,key,seed,base_note = 40,offset_factor = 0.3,division_factor = 0.4,disharmonies = 0.02):
     random.seed(seed)
 
-    first_note = Note(0,section_instance.length_beats,Note.closest_note_value(base_note + random.randint(-15,15),key),100)
+    probability_bar   = 0.55    # probability of generating a split at a bar start
+    probability_bar2  = 0.2     # probability of generating a split at multiples of bar half
+    probability_bar4  = 0.1     # probability of generating a split at multiples of bar quarter
+    probability_skip  = 0.1     # probability of skipping a note
+    probability_alter = 0.1     # probability of altering notes in repeating melody
 
-    print(first_note)
+    # sometimes make the melody repeat a little if possible:
 
-    return
+    possible_repeat_counts = [1]
+
+    for i in range(2,5):
+      if section_instance.length_beats % i == 0:
+        possible_repeat_counts.append(i)
+
+    repeat_count = random.choice(possible_repeat_counts)  # by how many bars the melody will be repeated
+    repeat_length = int(section_instance.length_beats / repeat_count)
+    split_times = [0,repeat_length]       # will contain times of note starts
+
+    for i in range(1,repeat_length * 4):  # go by quarters of a bar
+
+      if i % 4 == 0:            # whole bar
+        generate_split = random.random() <= probability_bar
+      elif i % 2 == 0:          # bar half
+        generate_split = random.random() <= probability_bar2
+      else:                     # bar quarter
+        generate_split = random.random() <= probability_bar4
+
+      if generate_split:
+        split_times.append(i * 0.25)
+
+    split_times.sort()
+
+    # generate the notes
+    note_value = Note.closest_note_value(base_note + random.randint(-15,15),key)
+
+    for i in range(len(split_times) - 1):
+      if random.random() <= probability_skip:    # sometimes skip a note
+        continue
+
+      transpose_by = random.randint(-4,4)
+
+      for j in range(repeat_count):
+        new_note = Note(split_times[i] + j * repeat_length,split_times[i + 1] - split_times[i],note_value,100)
+        new_note.transpose(key,transpose_by)
+
+        if random.random() <= probability_alter:    # sometimes alter the note
+          if random.random() <= 0.1:
+            continue                                      # drop the note
+          else:
+            new_note.transpose(key,random.randint(-3,3))  # alter the pitch
+
+        section_instance.tracks[track_number].add_note(new_note)
 
   ## Evaluates a build-in function for random value generation of the
   #  composer file language and returns the generated value.
@@ -490,6 +548,7 @@ class SectionInstance:
 
   ## Adds given track to the section.
   def add_track(self,track):
+    track.length_beats = self.length_beats
     self.tracks.append(track)
 
   def __str__(self):
@@ -697,27 +756,24 @@ class Composition:
     # it seems the midiutil library doesn't support time signature event so far :/
 
     number_of_tracks = self.number_of_tracks()
-
     midi = MIDIFile(number_of_tracks)
-
-    midi.addNote(0,0,60,20,1,100)
-    midi.addNote(0,0,60,2,1,100)
-
     section_offset = 0   # current section offset in beats
-
     track_instruments = [None for i in range(number_of_tracks)]         # holds track instruments
 
     # process all section instances:
     for section_instance in self.section_instances:
-      print("section")
+      for event in section_instance.meta_events:      # write events
+        if event[1] == EVENT_TEMPO_CHANGE:
+          for t in range(number_of_tracks):
+            midi.addTempo(t,section_offset + event[0],event[2])
 
       for section_track in section_instance.tracks:
         track_number = 0   # which midi track to write the notes to
-        print("track")
 
-        while track_number < number_of_tracks - 1:      # find the appropriate track
+        while track_number < number_of_tracks:      # find the appropriate track
           if track_instruments[track_number] == None:   # empty track - take it
-            track_instruments[track_number] = section_track.instrument
+            track_instruments[track_number] = section_track.instrument  # set the track to given instrument
+            midi.addProgramChange(track_number,track_number,0,instrument_to_midi(section_track.instrument))
             break
           elif track_instruments[track_number] == section_track.instrument:  # appropriate track (the same instrument) - take it
             break
@@ -726,14 +782,14 @@ class Composition:
 
         # here we have the track number
 
+        for note in section_track.notes:
+          midi.addNote(track_number,track_number,note.note,section_offset + note.start,note.length,note.velocity)
 
       section_offset += section_instance.length_beats
 
     midi_file = open(filename,'wb')
     midi.writeFile(midi_file)
     midi_file.close()
-
-
 
     return
 
@@ -768,32 +824,29 @@ t2 = SectionTrack()
 t3 = SectionTrack()
 t4 = SectionTrack()
 
-t2.add_note(Note(3.0,1.5,62,100))
-t2.add_note(Note(0.0,1,70,80))
-t3.add_note(Note(3.5,0.1,58,100))
-
 t1.instrument = INSTRUMENT_STRINGS
-t2.instrument = INSTRUMENT_GUITAR
+t2.instrument = INSTRUMENT_STRINGS
+
+s.length_beats = 30
 
 s.add_track(t1)
 s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-s.length_bars = 10
+r.generate_melody(s,0,KEY_C_NOTES,7000)
 
 t5 = SectionTrack()
 t6 = SectionTrack()
 
-t5.add_note(Note(0,1,52,100))
-
-t5.instrument = INSTRUMENT_GUITAR
+t5.instrument = INSTRUMENT_EBASS
 t6.instrument = INSTRUMENT_EBASS
 
 s2.add_track(t5)
 s2.add_track(t6)
 
 s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60)
+s2.add_meta_event(1.0,EVENT_TEMPO_CHANGE,120)
 
 c.add_section_instance(s)
 c.add_section_instance(s2)

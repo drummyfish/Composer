@@ -1,5 +1,6 @@
 *.mid
 *.pyc
+*.exe
 
 # Windows image file caches
 Thumbs.db

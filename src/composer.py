@@ -3,11 +3,12 @@ import random
 import itertools
 import collections
 import traceback
+from MidiFile3 import MIDIFile
 
 # some MIDI instrument codes:
 
 INSTRUMENT_PIANO = 1
-INSTRUMENT_GUITRAR = 25
+INSTRUMENT_GUITAR = 25
 INSTRUMENT_EBASS = 36
 INSTRUMENT_ROCK_DRUMS = 255    # not an actual MIDI code, this is an internal value
 INSTRUMENT_STRINGS = 48
@@ -678,7 +679,62 @@ class Composition:
 
     return result
 
-  def save_as_midi():
+  ## Gets number of tracks that will be needed for the MIDI file
+  #  (this is equal to number of instruments in the composition).
+  #
+  #  @return number of tracks for the composition
+
+  def number_of_tracks(self):
+    instrument_set = set()
+
+    for section_instance in self.section_instances:
+      for section_track in section_instance.tracks:
+        instrument_set.add(section_track.instrument)
+
+    return len(instrument_set)
+
+  def save_as_midi(self,filename):
+    # it seems the midiutil library doesn't support time signature event so far :/
+
+    number_of_tracks = self.number_of_tracks()
+
+    midi = MIDIFile(number_of_tracks)
+
+    midi.addNote(0,0,60,20,1,100)
+    midi.addNote(0,0,60,2,1,100)
+
+    section_offset = 0   # current section offset in beats
+
+    track_instruments = [None for i in range(number_of_tracks)]         # holds track instruments
+
+    # process all section instances:
+    for section_instance in self.section_instances:
+      print("section")
+
+      for section_track in section_instance.tracks:
+        track_number = 0   # which midi track to write the notes to
+        print("track")
+
+        while track_number < number_of_tracks - 1:      # find the appropriate track
+          if track_instruments[track_number] == None:   # empty track - take it
+            track_instruments[track_number] = section_track.instrument
+            break
+          elif track_instruments[track_number] == section_track.instrument:  # appropriate track (the same instrument) - take it
+            break
+
+          track_number += 1
+
+        # here we have the track number
+
+
+      section_offset += section_instance.length_beats
+
+    midi_file = open(filename,'wb')
+    midi.writeFile(midi_file)
+    midi_file.close()
+
+
+
     return
 
 #=======================================================================
@@ -703,7 +759,10 @@ r = RandomGenerator()
 #r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
 
 c = Composition()
+
 s = SectionInstance()
+s2 = SectionInstance()
+
 t1 = SectionTrack()
 t2 = SectionTrack()
 t3 = SectionTrack()
@@ -713,15 +772,33 @@ t2.add_note(Note(3.0,1.5,62,100))
 t2.add_note(Note(0.0,1,70,80))
 t3.add_note(Note(3.5,0.1,58,100))
 
+t1.instrument = INSTRUMENT_STRINGS
+t2.instrument = INSTRUMENT_GUITAR
+
 s.add_track(t1)
 s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
+s.length_bars = 10
+
+t5 = SectionTrack()
+t6 = SectionTrack()
+
+t5.add_note(Note(0,1,52,100))
+
+t5.instrument = INSTRUMENT_GUITAR
+t6.instrument = INSTRUMENT_EBASS
+
+s2.add_track(t5)
+s2.add_track(t6)
+
 s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60)
 
 c.add_section_instance(s)
-
-r.generate_melody(s,0,KEY_C_NOTES,1100,40)
+c.add_section_instance(s2)
 
 print(c)
+print(c.number_of_tracks())
+
+c.save_as_midi("test.mid")

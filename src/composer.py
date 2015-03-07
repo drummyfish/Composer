@@ -3,6 +3,7 @@ import random
 import itertools
 import collections
 import traceback
+import sys
 from MidiFile3 import MIDIFile
 
 # instrument codes, these may not correspond to actual midi codes,
@@ -16,6 +17,21 @@ INSTRUMENT_EBASS = 36
 INSTRUMENT_ROCK_DRUMS = 255       # internal value
 INSTRUMENT_STRINGS = 48
 EVENT_TEMPO_CHANGE = 1000
+
+# these correspond to MIDI codes:
+NOTE_DRUM_BASS = 35
+NOTE_DRUM_SIDE_STICK = 37
+NOTE_DRUM_SNARE = 38
+NOTE_DRUM_TOM_HIGH = 50
+NOTE_DRUM_TOM_MID = 48
+NOTE_DRUM_TOM_LOW = 45
+NOTE_DRUM_HIHAT_CLOSED = 42
+NOTE_DRUM_HIHAT_PEDAL = 44
+NOTE_DRUM_CYMBAL_CRASH = 49
+NOTE_DRUM_CYMBAL_RIDE = 51
+NOTE_DRUM_CYMBAL_RIDE_BELL = 53
+NOTE_DRUM_CYMBAL_SPLASH = 55
+NOTE_DRUM_CLAP = 39
 
 KEY_C_NOTES = [i * 12 for i in range(11)]                # contains all key codes for the C key
 KEY_C_NOTES += [i * 12 + 2 for i in range(11)]
@@ -132,6 +148,84 @@ class RandomGenerator:
             new_note.transpose(key,random.randint(-3,3))  # alter the pitch
 
         section_instance.tracks[track_number].add_note(new_note)
+
+  ## Generates a rock beat track.
+  #
+  #  @param section_instance section instance containing the track to
+  #         generate the track into
+  #  @param track_number number of track to generate the beat to
+  #  @param seed random seed
+
+  def generate_rock_beat(self,section_instance,track_number,seed):
+    random.seed(seed)
+
+    # track beat pattern that will be repeated throughout the section:
+    pattern_track = []
+
+    # how many times the pattern will be repeated
+    pattern_repeat = int(section_instance.length_beats / section_instance.beats_in_bar)
+
+    for i in range(section_instance.beats_in_bar * 4):  # quarter-beat resolution
+      pattern_track.append([])
+
+      # assign probabilities:
+      bass_probability = 0.15
+      snare_probability = 0.15
+      hihat_probability = 0.15
+
+      if i == 0:
+        bass_probability = 0.9
+      elif i % 8 == 0:     # odd beat start => higher bass probability
+        bass_probability = 0.6
+
+      if (i + 4) % 8 == 0:
+        snare_probability = 0.6
+
+      if i % 2 == 0:
+        hihat_probability = 0.95
+
+      print(bass_probability)
+
+      # generate the pattern:
+      if random.random() < bass_probability:
+        pattern_track[-1].append(NOTE_DRUM_BASS)
+
+      if random.random() < snare_probability:
+        pattern_track[-1].append(NOTE_DRUM_SNARE)
+
+      if random.random() < hihat_probability:
+        pattern_track[-1].append(NOTE_DRUM_HIHAT_CLOSED)
+
+    # generate actual notes:
+
+    for i in range(len(pattern_track)):
+      for j in range(pattern_repeat):
+        for note in pattern_track[i]:
+          section_instance.tracks[track_number].add_note(Note(j * section_instance.beats_in_bar + i / 4.0,0.1,note,100))
+
+    # DELETEEEEEEEEEE:
+    nope = True
+
+    while nope:
+      nope = False
+      for aaa in pattern_track:
+        if len(aaa) == 0:
+          sys.stdout.write(" ")
+        else:
+          nope = True
+          itm = aaa.pop()
+
+          if itm == NOTE_DRUM_BASS:
+            sys.stdout.write("B")
+          elif itm == NOTE_DRUM_SNARE:
+            sys.stdout.write("S")
+          elif itm == NOTE_DRUM_HIHAT_CLOSED:
+            sys.stdout.write("H")
+          else:
+            sys.stdout.write("?")
+
+      print("")
+
 
   ## Evaluates a build-in function for random value generation of the
   #  composer file language and returns the generated value.
@@ -739,7 +833,8 @@ class Composition:
     return result
 
   ## Gets number of tracks that will be needed for the MIDI file
-  #  (this is equal to number of instruments in the composition).
+  #  (this is equal to number of instruments in the composition plus
+  #  one for a special drum channel).
   #
   #  @return number of tracks for the composition
 
@@ -750,7 +845,17 @@ class Composition:
       for section_track in section_instance.tracks:
         instrument_set.add(section_track.instrument)
 
-    return len(instrument_set)
+    return len(instrument_set) + 1
+
+  ## Private function, maps track numbers to channels.
+
+  def __track_number_to_channel(self,track_number):
+    if track_number == 0:   # drums, channel 10 by MIDI specification
+      return 9    # = 10 - 1
+    elif track_number >= 10:
+      return track_number   # = track_number - 1 + 1
+
+    return track_number - 1
 
   def save_as_midi(self,filename):
     # it seems the midiutil library doesn't support time signature event so far :/
@@ -768,22 +873,27 @@ class Composition:
             midi.addTempo(t,section_offset + event[0],event[2])
 
       for section_track in section_instance.tracks:
-        track_number = 0   # which midi track to write the notes to
+        track_number = 1   # which midi track to write the notes to
 
-        while track_number < number_of_tracks:      # find the appropriate track
-          if track_instruments[track_number] == None:   # empty track - take it
-            track_instruments[track_number] = section_track.instrument  # set the track to given instrument
-            midi.addProgramChange(track_number,track_number,0,instrument_to_midi(section_track.instrument))
-            break
-          elif track_instruments[track_number] == section_track.instrument:  # appropriate track (the same instrument) - take it
-            break
+        if section_track.instrument == INSTRUMENT_ROCK_DRUMS:
+          track_number = 0         # 0 is reserved for drums
+        else:
+          while track_number < number_of_tracks:      # find the appropriate track
+            if track_instruments[track_number] == None:   # empty track - take it
+              track_instruments[track_number] = section_track.instrument  # set the track to given instrument
+              midi.addProgramChange(track_number,self.__track_number_to_channel(track_number),0,instrument_to_midi(section_track.instrument))
+              break
+            elif track_instruments[track_number] == section_track.instrument:  # appropriate track (the same instrument) - take it
+              break
 
-          track_number += 1
+            track_number += 1
 
         # here we have the track number
 
+        track_channel = self.__track_number_to_channel(track_number)
+
         for note in section_track.notes:
-          midi.addNote(track_number,track_number,note.note,section_offset + note.start,note.length,note.velocity)
+          midi.addNote(track_number,track_channel,note.note,section_offset + note.start,note.length,note.velocity)
 
       section_offset += section_instance.length_beats
 
@@ -826,6 +936,8 @@ t4 = SectionTrack()
 
 t1.instrument = INSTRUMENT_STRINGS
 t2.instrument = INSTRUMENT_STRINGS
+t3.instrument = INSTRUMENT_ROCK_DRUMS
+t4.instrument = INSTRUMENT_ROCK_DRUMS
 
 s.length_beats = 30
 
@@ -834,7 +946,10 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-r.generate_melody(s,0,KEY_C_NOTES,7000)
+r.generate_melody(s,0,KEY_C_NOTES,9000)
+
+r.generate_rock_beat(s,3,6000)
+
 
 t5 = SectionTrack()
 t6 = SectionTrack()

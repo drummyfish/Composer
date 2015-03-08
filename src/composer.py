@@ -149,6 +149,61 @@ class RandomGenerator:
 
         section_instance.tracks[track_number].add_note(new_note)
 
+  ## Generates chords in to given track of given section instance.
+  #
+  #  @param section_instance section instance containing the track to
+  #         generate the track into
+  #  @param track_number number of track to generate the chords to
+  #  @param key list of note codes, sets the key
+  #  @param seed random seed
+  #  @param repeat_after_bars after how many bars the chord pattern
+  #         should be repeated
+
+  def generate_chords(self,section_instance,track_number,key,seed,repeat_after_bars = 4):
+    random.seed(seed)
+
+    chord_bases = []     # will contain generated chord base notes
+    current_note = Note.closest_note_value(random.randint(48,59),key)   # C to B
+
+    # generate the base notes:
+    for i in range(repeat_after_bars * section_instance.beats_in_bar):
+      change_probability = 0.98 if i % section_instance.beats_in_bar == 0 else 0.07
+
+      if random.random() < change_probability:   # change note
+        current_note = Note.closest_note_value(random.randint(48,59),key)
+
+      chord_bases.append(current_note)
+
+    print("sasasa")
+    print(chord_bases)
+
+    # generate the actual notes:
+    i = 0
+    while i < len(chord_bases):
+      if chord_bases[i] == None:
+        continue
+
+      time_start = i
+
+      j = i + 1
+      while j < len(chord_bases) and chord_bases[j] == chord_bases[i]:
+        j += 1
+
+      time_end = j
+
+      upper_note = chord_bases[i] + 7
+
+      middle_note = chord_bases[i] + 3
+
+      if not middle_note in key:     # changes minor to major if needed
+        middle_note += 1
+
+      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,chord_bases[i],100))
+      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,upper_note,100))
+      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,middle_note,100))
+
+      i = j
+
   ## Generates a rock beat track.
   #
   #  @param section_instance section instance containing the track to
@@ -934,9 +989,9 @@ t2 = SectionTrack()
 t3 = SectionTrack()
 t4 = SectionTrack()
 
-t1.instrument = INSTRUMENT_STRINGS
+t1.instrument = INSTRUMENT_PIANO
 t2.instrument = INSTRUMENT_STRINGS
-t3.instrument = INSTRUMENT_ROCK_DRUMS
+t3.instrument = INSTRUMENT_STRINGS
 t4.instrument = INSTRUMENT_ROCK_DRUMS
 
 s.length_beats = 30
@@ -946,10 +1001,11 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-r.generate_melody(s,0,KEY_C_NOTES,9000)
+seed = 1
 
-r.generate_rock_beat(s,3,6000)
-
+r.generate_melody(s,0,KEY_C_NOTES,seed)
+r.generate_rock_beat(s,3,seed)
+r.generate_chords(s,2,KEY_C_NOTES,seed)
 
 t5 = SectionTrack()
 t6 = SectionTrack()

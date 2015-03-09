@@ -210,8 +210,10 @@ class RandomGenerator:
   #         generate the track into
   #  @param track_number number of track to generate the beat to
   #  @param seed random seed
+  #  @param speed how fast the beat will be (float, 0 - 1)
+  #  @param strength how strong the beat will be (float, 0 - 1)
 
-  def generate_rock_beat(self,section_instance,track_number,seed):
+  def generate_rock_beat(self,section_instance,track_number,seed,speed = 0.5,strength = 0.8):
     random.seed(seed)
 
     # track beat pattern that will be repeated throughout the section:
@@ -220,43 +222,51 @@ class RandomGenerator:
     # how many times the pattern will be repeated
     pattern_repeat = int(section_instance.length_beats / section_instance.beats_in_bar)
 
+    hihat_cymbal = random.choice([NOTE_DRUM_HIHAT_CLOSED,NOTE_DRUM_HIHAT_PEDAL,NOTE_DRUM_CYMBAL_RIDE])
+
+    if speed < 0.2:
+      hihat_rythms = [2,4]
+    elif speed < 0.5:
+      hihat_rythms = [2]
+    elif speed < 0.8:
+      hihat_rythms = [1,2]
+    else:
+      hihat_rythms = [1]
+
+    hihat_rythm = random.choice(hihat_rythms)
+
     for i in range(section_instance.beats_in_bar * 4):  # quarter-beat resolution
       pattern_track.append([])
 
       # assign probabilities:
-      bass_probability = 0.15
-      snare_probability = 0.15
-      hihat_probability = 0.15
+      bass_probability = (0.8 if i == 0 else 0.08) + speed * 0.6
+      snare_probability = (0.6 if (i + 4) % 8 == 0 else 0.03) + speed * 0.6
+      hihat_probability = 0.99 if i % hihat_rythm == 0 else 0.02
 
-      if i == 0:
-        bass_probability = 0.9
-      elif i % 8 == 0:     # odd beat start => higher bass probability
-        bass_probability = 0.6
-
-      if (i + 4) % 8 == 0:
-        snare_probability = 0.6
-
-      if i % 2 == 0:
-        hihat_probability = 0.95
-
-      print(bass_probability)
+      if i < 4:
+        interchange_snare_and_bass = False
+      else:
+        interchange_snare_and_bass = True if random.random() < 0.2 else False
 
       # generate the pattern:
       if random.random() < bass_probability:
-        pattern_track[-1].append(NOTE_DRUM_BASS)
+        pattern_track[-1].append(NOTE_DRUM_BASS if not interchange_snare_and_bass else NOTE_DRUM_SNARE)
 
       if random.random() < snare_probability:
-        pattern_track[-1].append(NOTE_DRUM_SNARE)
+        pattern_track[-1].append(NOTE_DRUM_SNARE if not interchange_snare_and_bass else NOTE_DRUM_BASS)
 
       if random.random() < hihat_probability:
-        pattern_track[-1].append(NOTE_DRUM_HIHAT_CLOSED)
+        pattern_track[-1].append(hihat_cymbal)
 
     # generate actual notes:
 
     for i in range(len(pattern_track)):
       for j in range(pattern_repeat):
         for note in pattern_track[i]:
-          section_instance.tracks[track_number].add_note(Note(j * section_instance.beats_in_bar + i / 4.0,0.1,note,100))
+          if random.random() < 0.05:    # sometimes frop the note to make the pattern a bit different
+            continue
+
+          section_instance.tracks[track_number].add_note(Note(j * section_instance.beats_in_bar + i / 4.0,0.1,note,int(strength * 128)))
 
     # DELETEEEEEEEEEE:
     nope = True
@@ -1001,11 +1011,11 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-seed = 1
+seed = 9
 
-r.generate_melody(s,0,KEY_C_NOTES,seed)
-r.generate_rock_beat(s,3,seed)
-r.generate_chords(s,2,KEY_C_NOTES,seed)
+#r.generate_melody(s,0,KEY_C_NOTES,seed)
+r.generate_rock_beat(s,3,seed,0.6,0.8)
+#r.generate_chords(s,2,KEY_C_NOTES,seed)
 
 t5 = SectionTrack()
 t6 = SectionTrack()

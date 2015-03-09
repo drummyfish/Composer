@@ -256,41 +256,31 @@ class RandomGenerator:
         pattern_track[-1].append(NOTE_DRUM_SNARE if not interchange_snare_and_bass else NOTE_DRUM_BASS)
 
       if random.random() < hihat_probability:
-        pattern_track[-1].append(hihat_cymbal)
+        if random.random() < 0.98:                  # mostly hit the hihat but sometimes hit something else
+          pattern_track[-1].append(hihat_cymbal)
+        else:
+          pattern_track[-1].append(random.choice([NOTE_DRUM_CYMBAL_RIDE,NOTE_DRUM_CYMBAL_RIDE_BELL]))
 
     # generate actual notes:
 
     for i in range(len(pattern_track)):
       for j in range(pattern_repeat):
         for note in pattern_track[i]:
-          if random.random() < 0.05:    # sometimes frop the note to make the pattern a bit different
+          if random.random() < 0.05:    # sometimes drop the note to make the pattern a bit different
             continue
 
           section_instance.tracks[track_number].add_note(Note(j * section_instance.beats_in_bar + i / 4.0,0.1,note,int(strength * 128)))
 
-    # DELETEEEEEEEEEE:
-    nope = True
+    # add some cymbals:
 
-    while nope:
-      nope = False
-      for aaa in pattern_track:
-        if len(aaa) == 0:
-          sys.stdout.write(" ")
-        else:
-          nope = True
-          itm = aaa.pop()
-
-          if itm == NOTE_DRUM_BASS:
-            sys.stdout.write("B")
-          elif itm == NOTE_DRUM_SNARE:
-            sys.stdout.write("S")
-          elif itm == NOTE_DRUM_HIHAT_CLOSED:
-            sys.stdout.write("H")
-          else:
-            sys.stdout.write("?")
-
-      print("")
-
+    if strength >= 0.6:
+      if random.random() < 0.8:
+        start = random.choice([0,1])
+        section_instance.tracks[track_number].add_note(Note(start,0.1,random.choice([NOTE_DRUM_CYMBAL_CRASH,NOTE_DRUM_CYMBAL_SPLASH]),80))
+    elif strength >= 0.8:
+      if random.random() < 0.99:
+        start = random.choice([0,1])
+        section_instance.tracks[track_number].add_note(Note(start,0.1,NOTE_DRUM_CYMBAL_CRASH,80))
 
   ## Evaluates a build-in function for random value generation of the
   #  composer file language and returns the generated value.
@@ -1011,11 +1001,11 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-seed = 9
+seed = 20
 
-#r.generate_melody(s,0,KEY_C_NOTES,seed)
+r.generate_melody(s,0,KEY_C_NOTES,seed)
 r.generate_rock_beat(s,3,seed,0.6,0.8)
-#r.generate_chords(s,2,KEY_C_NOTES,seed)
+r.generate_chords(s,2,KEY_C_NOTES,seed)
 
 t5 = SectionTrack()
 t6 = SectionTrack()

@@ -93,17 +93,15 @@ class RandomGenerator:
   #  @param disharmonies double in range <0,1>, says how many
   #         disharmonies there will be
 
-  def generate_melody(self,section_instance,track_number,key,seed,base_note = 40,offset_factor = 0.3,division_factor = 0.4,disharmonies = 0.02):
+  def generate_melody(self,section_instance,track_number,key,seed,base_note = 60,offset_factor = 0.3,division_factor = 0.4,disharmonies = 0.02):
     random.seed(seed)
 
     probability_bar   = 0.55    # probability of generating a split at a bar start
     probability_bar2  = 0.2     # probability of generating a split at multiples of bar half
     probability_bar4  = 0.1     # probability of generating a split at multiples of bar quarter
-    probability_skip  = 0.1     # probability of skipping a note
     probability_alter = 0.1     # probability of altering notes in repeating melody
 
     # sometimes make the melody repeat a little if possible:
-
     possible_repeat_counts = [1]
 
     for i in range(2,5):
@@ -115,7 +113,6 @@ class RandomGenerator:
     split_times = [0,repeat_length]       # will contain times of note starts
 
     for i in range(1,repeat_length * 4):  # go by quarters of a bar
-
       if i % 4 == 0:            # whole bar
         generate_split = random.random() <= probability_bar
       elif i % 2 == 0:          # bar half
@@ -128,22 +125,25 @@ class RandomGenerator:
 
     split_times.sort()
 
-    # generate the notes
+    # generate the notes at the splits
     note_value = Note.closest_note_value(base_note + random.randint(-15,15),key)
 
-    for i in range(len(split_times) - 1):
-      if random.random() <= probability_skip:    # sometimes skip a note
-        continue
+    max_offset = int(offset_factor * 15)
 
-      transpose_by = random.randint(-4,4)
+    for i in range(len(split_times) - 1):
+      split_length = split_times[i + 1] - split_times[i]
+      transpose_by = random.randint(-1 * max_offset,max_offset)
 
       for j in range(repeat_count):
-        new_note = Note(split_times[i] + j * repeat_length,split_times[i + 1] - split_times[i],note_value,100)
+        new_note = Note(split_times[i] + j * repeat_length,split_length,note_value,100)
         new_note.transpose(key,transpose_by)
 
         if random.random() <= probability_alter:    # sometimes alter the note
-          if random.random() <= 0.1:
-            continue                                      # drop the note
+          probability_skip = 0.3 if split_length <= 1 else 0.02             # probability of skipping a note
+
+          if random.random() <= probability_skip:
+            continue
+
           else:
             new_note.transpose(key,random.randint(-3,3))  # alter the pitch
 
@@ -158,8 +158,14 @@ class RandomGenerator:
   #  @param seed random seed
   #  @param repeat_after_bars after how many bars the chord pattern
   #         should be repeated
+  #  @param seventh_factor says how likely it is to generate a seventh
+  #         chord (float 0 - 1)
+  #  @param fullness_factor says how "full" the generated track will
+  #         sound (float 0 - 1), this affects how many hotes playing at
+  #         the same time there will be
+  #  @param speed how fast the chords will change (float 0 - 1)
 
-  def generate_chords(self,section_instance,track_number,key,seed,repeat_after_bars = 4):
+  def generate_chords(self, section_instance, track_number, key, seed, repeat_after_bars = 4, seventh_factor = 0.04, fullness_factor = 0.5, speed = 0.5):
     random.seed(seed)
 
     chord_bases = []     # will contain generated chord base notes
@@ -167,15 +173,18 @@ class RandomGenerator:
 
     # generate the base notes:
     for i in range(repeat_after_bars * section_instance.beats_in_bar):
-      change_probability = 0.98 if i % section_instance.beats_in_bar == 0 else 0.07
+
+      if speed < 0.3:
+        change_probability = speed * 1.5 if i % section_instance.beats_in_bar == 0 else 0
+      elif speed > 0.8:
+        change_probability = 0.98 if i % section_instance.beats_in_bar == 0 else speed * 0.9
+      else:
+        change_probability = 0.9 if i % section_instance.beats_in_bar == 0 else 0.1
 
       if random.random() < change_probability:   # change note
         current_note = Note.closest_note_value(random.randint(48,59),key)
 
       chord_bases.append(current_note)
-
-    print("sasasa")
-    print(chord_bases)
 
     # generate the actual notes:
     i = 0
@@ -190,17 +199,46 @@ class RandomGenerator:
         j += 1
 
       time_end = j
+      note_length = time_end - time_start
 
       upper_note = chord_bases[i] + 7
-
       middle_note = chord_bases[i] + 3
+      seventh_note = chord_bases[i] + 10 if random.random() < seventh_factor else 0
 
       if not middle_note in key:     # changes minor to major if needed
         middle_note += 1
 
-      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,chord_bases[i],100))
-      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,upper_note,100))
-      section_instance.tracks[track_number].add_note(Note(time_start,time_end - time_start,middle_note,100))
+      if seventh_note != 0 and seventh_note not in key:
+        seventh_note += 1
+
+      while time_start < section_instance.length_beats:
+        section_instance.tracks[track_number].add_note(Note(time_start,note_length,chord_bases[i],100))
+
+        if fullness_factor >= 0.2:
+          section_instance.tracks[track_number].add_note(Note(time_start,note_length,middle_note,100))
+
+          if fullness_factor >= 0.4:
+            section_instance.tracks[track_number].add_note(Note(time_start,note_length,upper_note,100))
+
+            if seventh_note != 0:
+              section_instance.tracks[track_number].add_note(Note(time_start,note_length,seventh_note,100))
+
+            if fullness_factor >= 0.6:
+              helper_note = Note(time_start,note_length,chord_bases[i],100)
+              helper_note.transpose(key,-7)
+              section_instance.tracks[track_number].add_note(helper_note)
+
+              if fullness_factor >= 0.8:
+                helper_note = Note(time_start,note_length,middle_note,100)
+                helper_note.transpose(key,7)
+                section_instance.tracks[track_number].add_note(helper_note)
+
+                if fullness_factor >= 0.9:
+                  helper_note = Note(time_start,note_length,chord_bases[i],100)
+                  helper_note.transpose(key,7)
+                  section_instance.tracks[track_number].add_note(helper_note)
+
+        time_start += repeat_after_bars * section_instance.beats_in_bar
 
       i = j
 
@@ -989,7 +1027,7 @@ t2 = SectionTrack()
 t3 = SectionTrack()
 t4 = SectionTrack()
 
-t1.instrument = INSTRUMENT_PIANO
+t1.instrument = INSTRUMENT_STRINGS
 t2.instrument = INSTRUMENT_STRINGS
 t3.instrument = INSTRUMENT_STRINGS
 t4.instrument = INSTRUMENT_ROCK_DRUMS
@@ -1001,11 +1039,11 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-seed = 20
+seed = 100
 
-r.generate_melody(s,0,KEY_C_NOTES,seed)
-r.generate_rock_beat(s,3,seed,0.6,0.8)
-r.generate_chords(s,2,KEY_C_NOTES,seed)
+#r.generate_melody(s,0,KEY_C_NOTES,seed,offset_factor = 0.3)
+#r.generate_rock_beat(s,3,seed,0.6,0.8)
+r.generate_chords(s,2,KEY_C_NOTES,seed,speed=0.2)
 
 t5 = SectionTrack()
 t6 = SectionTrack()

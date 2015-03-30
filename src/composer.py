@@ -73,6 +73,96 @@ def instrument_to_midi(instrument):
 
 class RandomGenerator:
 
+  ## Generates harmonies to given reference track into another track.
+  #
+  #  @param section_instance SectionInstance object that holds a track
+  #         into which the melody will be generated and the reference track
+  #  @param track_number number fo track into which the harmonies will be
+  #         generated
+  #  @param reference_track_number number of the reference track, i.e. the track
+  #         that will be used as a reference for the harmonies, typically this
+  #         will be a track with chords
+  #  @param key list of note codes, sets the melody key
+  #  @param seed random seed
+  #  @param base_note base note
+  #  @param harmony_factor float in range <0,1>, says how much the track will
+  #         be harmonic with the reference track
+  #  @param offset_factor float in range <0,1>, says how much the note
+  #         pitch will be different between the generated notes, higher
+  #         number will generate a melody with higher pitch range
+  #  @param speed float in range <0,1>, says how fast the generated track will
+  #         be
+
+  def generate_harmonies(self, section_instance, track_number, reference_track_number, key, seed, base_note = 60, harmony_factor = 0.9, offset_factor = 0.3, speed = 0.3):
+    random.seed(seed)
+    pattern_length = section_instance.beats_in_bar * 4   # repeated pattern length in beats
+
+    if speed > 0.85:
+      note_length = 0.25
+    elif speed > 0.6:
+      note_length = 0.5
+    elif speed > 0.4:
+      note_length = 1.0
+    elif speed > 0.2:
+      note_length = section_instance.beats_in_bar / 2
+    else:
+      note_length = section_instance.beats_in_bar
+
+    pause_probability = 1.0 / (2 * pattern_length / note_length)
+    pattern = []   # will contain relative notes
+
+    # generate relative notes:
+    for i in range(pattern_length):
+      interval_boundary = int(offset_factor * 30)
+
+      if random.random() > pause_probability:
+        pattern.append(base_note + random.randint(-1 * interval_boundary,interval_boundary))
+      else:     # generate pause sometimes
+        pattern.append(None)
+
+    # generate the actual notes
+    offset = 0
+
+    while offset <= section_instance.length_beats:
+      for i in range(pattern_length):
+        if pattern[i] == None:
+          continue
+
+        note_start = offset + i * note_length
+
+        if harmony_factor < 0.1:
+          possible_notes = range(200)  # all possible notes
+        elif harmony_factor < 0.6:
+          possible_notes = key         # only key notes
+        else:
+          # add only notes in the reference track
+          possible_notes = section_instance.tracks[reference_track_number].notes_at(note_start)
+
+          notes_to_add = 5 - round((harmony_factor - 0.6) / 0.4 * 5)
+
+          for helper_value in range(notes_to_add):
+            new_note = random.randint(base_note - 12,base_note + 12)
+            if not (new_note in possible_notes):
+              possible_notes.append(new_note)
+
+          possible_notes_copy = list(possible_notes)
+
+          for helper_note in possible_notes_copy:  # transpose the notes
+            possible_notes.append(helper_note + 12)
+            possible_notes.append(helper_note - 12)
+
+        note_value = Note.closest_note_value(pattern[i],possible_notes)
+
+        if i != 0 and section_instance.tracks[track_number].notes[-1].note == note_value:
+          section_instance.tracks[track_number].notes[-1].length += note_length
+          continue
+
+        section_instance.tracks[track_number].add_note(Note(note_start,note_length,note_value,100))
+
+      offset += pattern_length * note_length
+
+    return
+
   ## Generates a random melody into given track of given section
   #  instance.
   #
@@ -93,7 +183,7 @@ class RandomGenerator:
   #  @param disharmonies double in range <0,1>, says how many
   #         disharmonies there will be
 
-  def generate_melody(self,section_instance,track_number,key,seed,base_note = 60,offset_factor = 0.3,division_factor = 0.4,disharmonies = 0.02):
+  def generate_melody(self, section_instance, track_number, key, seed, base_note = 60, offset_factor = 0.3, division_factor = 0.4, disharmonies = 0.02):
     random.seed(seed)
 
     probability_bar   = 0.55    # probability of generating a split at a bar start
@@ -210,6 +300,8 @@ class RandomGenerator:
 
       if seventh_note != 0 and seventh_note not in key:
         seventh_note += 1
+
+      # generate the actual notes
 
       while time_start < section_instance.length_beats:
         section_instance.tracks[track_number].add_note(Note(time_start,note_length,chord_bases[i],100))
@@ -770,10 +862,7 @@ class Note:
   #          is in given key
 
   def closest_note_value(value, key):
-    if value in key:
-      return value
-
-    for i in range(100):
+    for i in range(200):
       if value + i in key:
         return value + i
       elif value - i in key:
@@ -864,6 +953,20 @@ class SectionTrack:
 
   def __init__(self):
     self.init_attributes()
+
+  ## Returns a note at given time.
+  #
+  #  @param time time (in beats, float)
+  #  @return list of note values (not Note objects) at given time (may be empty)
+
+  def notes_at(self, time):
+    result = []
+
+    for note in self.notes:
+      if note.start <= time and note.start + note.length >= time:
+        result.append(note.note)
+
+    return result
 
   ## Sorts the notes list so they are in order in which the start
   #  playing.
@@ -1027,8 +1130,8 @@ t2 = SectionTrack()
 t3 = SectionTrack()
 t4 = SectionTrack()
 
-t1.instrument = INSTRUMENT_STRINGS
-t2.instrument = INSTRUMENT_STRINGS
+t1.instrument = INSTRUMENT_PIANO
+t2.instrument = INSTRUMENT_PIANO
 t3.instrument = INSTRUMENT_STRINGS
 t4.instrument = INSTRUMENT_ROCK_DRUMS
 
@@ -1039,11 +1142,12 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-seed = 100
+seed = 1200
 
-#r.generate_melody(s,0,KEY_C_NOTES,seed,offset_factor = 0.3)
-#r.generate_rock_beat(s,3,seed,0.6,0.8)
-r.generate_chords(s,2,KEY_C_NOTES,seed,speed=0.2)
+r.generate_melody(s,0,KEY_C_NOTES,seed,offset_factor = 0.3)
+r.generate_rock_beat(s,3,seed,0.6,0.8)
+r.generate_chords(s,2,KEY_C_NOTES,seed)
+r.generate_harmonies(s,1,2,KEY_C_NOTES,seed,harmony_factor = 0.99,speed = 0.9)
 
 t5 = SectionTrack()
 t6 = SectionTrack()
@@ -1060,7 +1164,7 @@ s2.add_meta_event(1.0,EVENT_TEMPO_CHANGE,120)
 c.add_section_instance(s)
 c.add_section_instance(s2)
 
-print(c)
-print(c.number_of_tracks())
+#print(c)
+#print(c.number_of_tracks())
 
 c.save_as_midi("test.mid")

@@ -92,10 +92,13 @@ class RandomGenerator:
   #         number will generate a melody with higher pitch range
   #  @param speed float in range <0,1>, says how fast the generated track will
   #         be
+  #  @param fullness_factor float in range <0,1>, sas how full the generate_melody
+  #         track should be
 
-  def generate_harmonies(self, section_instance, track_number, reference_track_number, key, seed, base_note = 60, harmony_factor = 0.9, offset_factor = 0.3, speed = 0.3):
+  def generate_harmonies(self, section_instance, track_number, reference_track_number, key, seed, base_note = 80, harmony_factor = 0.9, offset_factor = 0.5, speed = 0.3, fullness_factor = 0.5):
     random.seed(seed)
-    pattern_length = section_instance.beats_in_bar * 4   # repeated pattern length in beats
+
+    pattern_length = section_instance.beats_in_bar * random.randint(1,3)   # repeated pattern length in beats
 
     if speed > 0.85:
       note_length = 0.25
@@ -158,6 +161,19 @@ class RandomGenerator:
           continue
 
         section_instance.tracks[track_number].add_note(Note(note_start,note_length,note_value,100))
+
+        # generate additional notes for fullness:
+
+        additional_notes = []
+        number_of_additional_notes = int((fullness_factor - 0.4) * 5)
+        number_of_additional_notes = 0 if number_of_additional_notes < 0 else number_of_additional_notes
+
+        for j in range(number_of_additional_notes):
+          additional_notes.append((j + 1) * 7)
+
+        for additional_note in additional_notes:
+          if random.random() > 0.85:
+            section_instance.tracks[track_number].add_note(Note(note_start,note_length,note_value + additional_note,100))
 
       offset += pattern_length * note_length
 
@@ -343,7 +359,7 @@ class RandomGenerator:
   #  @param speed how fast the beat will be (float, 0 - 1)
   #  @param strength how strong the beat will be (float, 0 - 1)
 
-  def generate_rock_beat(self,section_instance,track_number,seed,speed = 0.5,strength = 0.8):
+  def generate_rock_beat(self, section_instance, track_number, seed, speed = 0.5, strength = 0.8):
     random.seed(seed)
 
     # track beat pattern that will be repeated throughout the section:
@@ -1142,12 +1158,12 @@ s.add_track(t2)
 s.add_track(t3)
 s.add_track(t4)
 
-seed = 1200
+seed = 5000
 
 r.generate_melody(s,0,KEY_C_NOTES,seed,offset_factor = 0.3)
-r.generate_rock_beat(s,3,seed,0.6,0.8)
+r.generate_rock_beat(s,3,seed,0.1,0.7)
 r.generate_chords(s,2,KEY_C_NOTES,seed)
-r.generate_harmonies(s,1,2,KEY_C_NOTES,seed,harmony_factor = 0.99,speed = 0.9)
+r.generate_harmonies(s,1,2,KEY_C_NOTES,seed,harmony_factor = 0.99,speed = 0.7,fullness_factor = 0.9)
 
 t5 = SectionTrack()
 t6 = SectionTrack()

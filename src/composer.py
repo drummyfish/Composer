@@ -16,6 +16,7 @@ INSTRUMENT_GUITAR = 25
 INSTRUMENT_EBASS = 36
 INSTRUMENT_ROCK_DRUMS = 255       # internal value
 INSTRUMENT_STRINGS = 48
+INSTRUMENT_BRASS = 62
 EVENT_TEMPO_CHANGE = 1000
 
 # these correspond to MIDI codes:
@@ -33,7 +34,8 @@ NOTE_DRUM_CYMBAL_RIDE_BELL = 53
 NOTE_DRUM_CYMBAL_SPLASH = 55
 NOTE_DRUM_CLAP = 39
 
-KEY_C_NOTES = [i * 12 for i in range(11)]                # contains all key codes for the C key
+# contains all key codes for the C key
+KEY_C_NOTES = [i * 12 for i in range(11)]
 KEY_C_NOTES += [i * 12 + 2 for i in range(11)]
 KEY_C_NOTES += [i * 12 + 4 for i in range(11)]
 KEY_C_NOTES += [i * 12 + 5 for i in range(11)]
@@ -42,38 +44,95 @@ KEY_C_NOTES += [i * 12 + 9 for i in range(11)]
 KEY_C_NOTES += [i * 12 + 11 for i in range(10)]
 KEY_C_NOTES.sort()
 
-KEY_DB_NOTES  = [i + 1 for i in KEY_C_NOTES]
-KEY_D_NOTES   = [i + 2 for i in KEY_C_NOTES]
-KEY_EB_NOTES  = [i + 3 for i in KEY_C_NOTES]
-KEY_E_NOTES   = [i + 4 for i in KEY_C_NOTES]
-KEY_F_NOTES   = [i + 5 for i in KEY_C_NOTES]
-KEY_GB_NOTES  = [i + 6 for i in KEY_C_NOTES]
-KEY_G_NOTES   = [i + 7 for i in KEY_C_NOTES]
-KEY_AB_NOTES  = [i + 8 for i in KEY_C_NOTES]
-KEY_A_NOTES   = [i + 9 for i in KEY_C_NOTES]
-KEY_BB_NOTES  = [i + 10 for i in KEY_C_NOTES]
-KEY_B_NOTES   = [i + 11 for i in KEY_C_NOTES]
+KEY_DB_NOTES = [i + 1 for i in KEY_C_NOTES]
+KEY_D_NOTES = [i + 2 for i in KEY_C_NOTES]
+KEY_EB_NOTES = [i + 3 for i in KEY_C_NOTES]
+KEY_E_NOTES = [i + 4 for i in KEY_C_NOTES]
+KEY_F_NOTES = [i + 5 for i in KEY_C_NOTES]
+KEY_GB_NOTES = [i + 6 for i in KEY_C_NOTES]
+KEY_G_NOTES = [i + 7 for i in KEY_C_NOTES]
+KEY_AB_NOTES = [i + 8 for i in KEY_C_NOTES]
+KEY_A_NOTES = [i + 9 for i in KEY_C_NOTES]
+KEY_BB_NOTES = [i + 10 for i in KEY_C_NOTES]
+KEY_B_NOTES = [i + 11 for i in KEY_C_NOTES]
 
-## Flattens nested lists.
+# Flattens nested lists.
 
 flatten = lambda *n: (e for a in n
-  for e in (flatten(*a) if isinstance(a, (tuple, list)) else (a,)))
+                      for e in (flatten(*a) if isinstance(a, (tuple, list)) else (a,)))
 
-## Converts internal instrumen code to MIDI instrument code
+# Converts internal instrumen code to MIDI instrument code
 #
 #  @param instrument internal instrument value (see constants)
 #  @return mapped MIDI instrument code
+
 
 def instrument_to_midi(instrument):
   return instrument
 
 #=======================================================================
 
-## Serves for random generation of various things.
+# Serves for random generation of various things.
+
 
 class RandomGenerator:
 
-  ## Generates harmonies to given reference track into another track.
+  def generate_bass(self, section_instance, track_number, reference_track_number, key, seed, speed=0.3, strength=0.5):
+    random.seed(seed)
+
+    highest_note = 38
+
+    pattern_length = section_instance.beats_in_bar * random.randint(1,3) * 2
+    pattern = []     # half-beat resolution, says if split happens or not
+
+    for i in range(pattern_length):
+      split_probability = speed / 2.0
+
+      if i % 2 != 0 and (int(i / 2) + 1) % section_instance.beats_in_bar == 0:  # bar start => higher split probability
+        split_probability += 0.5
+
+      pattern.append(random.random() <= split_probability)
+
+    pattern_lengths = []    # will contain relative times of splits generated from the pattern
+
+    position = 0
+    length = 0
+
+    while position < pattern_length:
+      length += 0.5
+
+      if pattern[position] or position == pattern_length - 1:
+        pattern_lengths.append(length)
+        length = 0
+
+      position += 1
+
+    # generate the actual notes:
+
+    position = 0
+    i = 0
+
+    while position < section_instance.length_beats:
+      length = pattern_lengths[i % len(pattern_lengths)]
+
+      notes = section_instance.tracks[reference_track_number].notes_at(position + 0.1)
+
+      if len(notes) != 0:
+        note_value = notes[0]
+
+        if random.random() < 0.1:
+          note_value = random.choice(notes)
+
+        while note_value > highest_note:
+          note_value -= 12
+
+        if random.random() < 0.90:  # sometimes skip the note
+          section_instance.tracks[track_number].add_note(Note(position,length,note_value,60 + int(strength * 67)))
+
+      position += length
+      i += 1
+
+  # Generates harmonies to given reference track into another track.
   #
   #  @param section_instance SectionInstance object that holds a track
   #         into which the melody will be generated and the reference track
@@ -95,10 +154,11 @@ class RandomGenerator:
   #  @param fullness_factor float in range <0,1>, sas how full the generate_melody
   #         track should be
 
-  def generate_harmonies(self, section_instance, track_number, reference_track_number, key, seed, base_note = 80, harmony_factor = 0.9, offset_factor = 0.5, speed = 0.3, fullness_factor = 0.5):
+  def generate_harmonies(self, section_instance, track_number, reference_track_number, key, seed, base_note=80, harmony_factor=0.9, offset_factor=0.5, speed=0.3, fullness_factor=0.5):
     random.seed(seed)
 
-    pattern_length = section_instance.beats_in_bar * random.randint(1,3)   # repeated pattern length in beats
+    pattern_length = section_instance.beats_in_bar * \
+        random.randint(1, 3)   # repeated pattern length in beats
 
     if speed > 0.85:
       note_length = 0.25
@@ -119,7 +179,8 @@ class RandomGenerator:
       interval_boundary = int(offset_factor * 30)
 
       if random.random() > pause_probability:
-        pattern.append(base_note + random.randint(-1 * interval_boundary,interval_boundary))
+        pattern.append(
+            base_note + random.randint(-1 * interval_boundary, interval_boundary))
       else:     # generate pause sometimes
         pattern.append(None)
 
@@ -139,28 +200,34 @@ class RandomGenerator:
           possible_notes = key         # only key notes
         else:
           # add only notes in the reference track
-          possible_notes = section_instance.tracks[reference_track_number].notes_at(note_start)
+          possible_notes = section_instance.tracks[
+              reference_track_number].notes_at(note_start)
 
           notes_to_add = 5 - round((harmony_factor - 0.6) / 0.4 * 5)
 
           for helper_value in range(notes_to_add):
-            new_note = random.randint(base_note - 12,base_note + 12)
+            new_note = random.randint(
+                base_note - 12, base_note + 12)
             if not (new_note in possible_notes):
               possible_notes.append(new_note)
 
           possible_notes_copy = list(possible_notes)
 
-          for helper_note in possible_notes_copy:  # transpose the notes
+          # transpose the notes
+          for helper_note in possible_notes_copy:
             possible_notes.append(helper_note + 12)
             possible_notes.append(helper_note - 12)
 
-        note_value = Note.closest_note_value(pattern[i],possible_notes)
+        note_value = Note.closest_note_value(
+            pattern[i], possible_notes)
 
         if i != 0 and section_instance.tracks[track_number].notes[-1].note == note_value:
-          section_instance.tracks[track_number].notes[-1].length += note_length
+          section_instance.tracks[
+              track_number].notes[-1].length += note_length
           continue
 
-        section_instance.tracks[track_number].add_note(Note(note_start,note_length,note_value,100))
+        section_instance.tracks[track_number].add_note(
+            Note(note_start, note_length, note_value, 100))
 
         # generate additional notes for fullness:
 
@@ -173,13 +240,14 @@ class RandomGenerator:
 
         for additional_note in additional_notes:
           if random.random() > 0.85:
-            section_instance.tracks[track_number].add_note(Note(note_start,note_length,note_value + additional_note,100))
+            section_instance.tracks[track_number].add_note(
+                Note(note_start, note_length, note_value + additional_note, 100))
 
       offset += pattern_length * note_length
 
     return
 
-  ## Generates a random melody into given track of given section
+  # Generates a random melody into given track of given section
   #  instance.
   #
   #  @param section_instance SectionInstance object that holds a track
@@ -199,26 +267,44 @@ class RandomGenerator:
   #  @param disharmonies double in range <0,1>, says how many
   #         disharmonies there will be
 
-  def generate_melody(self, section_instance, track_number, key, seed, base_note = 60, offset_factor = 0.3, division_factor = 0.4, disharmonies = 0.02):
+  def generate_melody(self, section_instance, track_number, key, seed, base_note=60, offset_factor=0.3, division_factor=0.5, disharmonies=0.02):
+    key_copy = list(key)
+
+    # add disharmonies to the key set:
+    for i in range(200):
+      if i in key_copy:
+        continue
+
+      if random.random() < disharmonies - 0.1:
+        key_copy.append(i)
+
+    key_copy.sort()
+
     random.seed(seed)
 
-    probability_bar   = 0.55    # probability of generating a split at a bar start
-    probability_bar2  = 0.2     # probability of generating a split at multiples of bar half
-    probability_bar4  = 0.1     # probability of generating a split at multiples of bar quarter
-    probability_alter = 0.1     # probability of altering notes in repeating melody
+    # probability of generating a split at a bar start
+    probability_bar = division_factor
+    # probability of generating a split at multiples of bar half
+    probability_bar2 = division_factor / 2.0
+    # probability of generating a split at multiples of bar quarter
+    probability_bar4 = division_factor / 5.0
+    # probability of altering notes in repeating melody
+    probability_alter = division_factor / 5.0
 
     # sometimes make the melody repeat a little if possible:
     possible_repeat_counts = [1]
 
-    for i in range(2,5):
+    for i in range(2, 5):
       if section_instance.length_beats % i == 0:
         possible_repeat_counts.append(i)
 
-    repeat_count = random.choice(possible_repeat_counts)  # by how many bars the melody will be repeated
+    # by how many bars the melody will be repeated
+    repeat_count = random.choice(possible_repeat_counts)
     repeat_length = int(section_instance.length_beats / repeat_count)
-    split_times = [0,repeat_length]       # will contain times of note starts
+    # will contain times of note starts
+    split_times = [0, repeat_length]
 
-    for i in range(1,repeat_length * 4):  # go by quarters of a bar
+    for i in range(1, repeat_length * 4):  # go by quarters of a bar
       if i % 4 == 0:            # whole bar
         generate_split = random.random() <= probability_bar
       elif i % 2 == 0:          # bar half
@@ -232,30 +318,35 @@ class RandomGenerator:
     split_times.sort()
 
     # generate the notes at the splits
-    note_value = Note.closest_note_value(base_note + random.randint(-15,15),key)
+    note_value = Note.closest_note_value(
+        base_note + random.randint(-15, 15), key_copy)
 
     max_offset = int(offset_factor * 15)
 
     for i in range(len(split_times) - 1):
       split_length = split_times[i + 1] - split_times[i]
-      transpose_by = random.randint(-1 * max_offset,max_offset)
+      transpose_by = random.randint(-1 * max_offset, max_offset)
 
       for j in range(repeat_count):
-        new_note = Note(split_times[i] + j * repeat_length,split_length,note_value,100)
-        new_note.transpose(key,transpose_by)
+        new_note = Note(
+            split_times[i] + j * repeat_length, split_length, note_value, 100)
+        new_note.transpose(key_copy, transpose_by)
 
-        if random.random() <= probability_alter:    # sometimes alter the note
-          probability_skip = 0.3 if split_length <= 1 else 0.02             # probability of skipping a note
+        # sometimes alter the note
+        if random.random() <= probability_alter:
+          # probability of skipping a note
+          probability_skip = 0.3 if split_length <= 1 else 0.02
 
           if random.random() <= probability_skip:
             continue
 
           else:
-            new_note.transpose(key,random.randint(-3,3))  # alter the pitch
+            # alter the pitch
+            new_note.transpose(key_copy, random.randint(-3, 3))
 
         section_instance.tracks[track_number].add_note(new_note)
 
-  ## Generates chords in to given track of given section instance.
+  # Generates chords in to given track of given section instance.
   #
   #  @param section_instance section instance containing the track to
   #         generate the track into
@@ -271,11 +362,11 @@ class RandomGenerator:
   #         the same time there will be
   #  @param speed how fast the chords will change (float 0 - 1)
 
-  def generate_chords(self, section_instance, track_number, key, seed, repeat_after_bars = 4, seventh_factor = 0.04, fullness_factor = 0.5, speed = 0.5):
+  def generate_chords(self, section_instance, track_number, key, seed, repeat_after_bars=4, seventh_factor=0.04, fullness_factor=0.5, speed=0.5):
     random.seed(seed)
 
     chord_bases = []     # will contain generated chord base notes
-    current_note = Note.closest_note_value(random.randint(48,59),key)   # C to B
+    current_note = Note.closest_note_value(random.randint(48, 59), key)   # C to B
 
     # generate the base notes:
     for i in range(repeat_after_bars * section_instance.beats_in_bar):
@@ -288,7 +379,7 @@ class RandomGenerator:
         change_probability = 0.9 if i % section_instance.beats_in_bar == 0 else 0.1
 
       if random.random() < change_probability:   # change note
-        current_note = Note.closest_note_value(random.randint(48,59),key)
+        current_note = Note.closest_note_value(random.randint(48, 59), key)
 
       chord_bases.append(current_note)
 
@@ -309,7 +400,8 @@ class RandomGenerator:
 
       upper_note = chord_bases[i] + 7
       middle_note = chord_bases[i] + 3
-      seventh_note = chord_bases[i] + 10 if random.random() < seventh_factor else 0
+      seventh_note = chord_bases[
+          i] + 10 if random.random() < seventh_factor else 0
 
       if not middle_note in key:     # changes minor to major if needed
         middle_note += 1
@@ -320,37 +412,47 @@ class RandomGenerator:
       # generate the actual notes
 
       while time_start < section_instance.length_beats:
-        section_instance.tracks[track_number].add_note(Note(time_start,note_length,chord_bases[i],100))
+        section_instance.tracks[track_number].add_note(
+            Note(time_start, note_length, chord_bases[i], 100))
 
         if fullness_factor >= 0.2:
-          section_instance.tracks[track_number].add_note(Note(time_start,note_length,middle_note,100))
+          section_instance.tracks[track_number].add_note(
+              Note(time_start, note_length, middle_note, 100))
 
           if fullness_factor >= 0.4:
-            section_instance.tracks[track_number].add_note(Note(time_start,note_length,upper_note,100))
+            section_instance.tracks[track_number].add_note(
+                Note(time_start, note_length, upper_note, 100))
 
             if seventh_note != 0:
-              section_instance.tracks[track_number].add_note(Note(time_start,note_length,seventh_note,100))
+              section_instance.tracks[track_number].add_note(
+                  Note(time_start, note_length, seventh_note, 100))
 
             if fullness_factor >= 0.6:
-              helper_note = Note(time_start,note_length,chord_bases[i],100)
-              helper_note.transpose(key,-7)
-              section_instance.tracks[track_number].add_note(helper_note)
+              helper_note = Note(
+                  time_start, note_length, chord_bases[i], 100)
+              helper_note.transpose(key, -7)
+              section_instance.tracks[
+                  track_number].add_note(helper_note)
 
               if fullness_factor >= 0.8:
-                helper_note = Note(time_start,note_length,middle_note,100)
-                helper_note.transpose(key,7)
-                section_instance.tracks[track_number].add_note(helper_note)
+                helper_note = Note(
+                    time_start, note_length, middle_note, 100)
+                helper_note.transpose(key, 7)
+                section_instance.tracks[
+                    track_number].add_note(helper_note)
 
                 if fullness_factor >= 0.9:
-                  helper_note = Note(time_start,note_length,chord_bases[i],100)
-                  helper_note.transpose(key,7)
-                  section_instance.tracks[track_number].add_note(helper_note)
+                  helper_note = Note(
+                      time_start, note_length, chord_bases[i], 100)
+                  helper_note.transpose(key, 7)
+                  section_instance.tracks[
+                      track_number].add_note(helper_note)
 
         time_start += repeat_after_bars * section_instance.beats_in_bar
 
       i = j
 
-  ## Generates a rock beat track.
+  # Generates a rock beat track.
   #
   #  @param section_instance section instance containing the track to
   #         generate the track into
@@ -359,76 +461,90 @@ class RandomGenerator:
   #  @param speed how fast the beat will be (float, 0 - 1)
   #  @param strength how strong the beat will be (float, 0 - 1)
 
-  def generate_rock_beat(self, section_instance, track_number, seed, speed = 0.5, strength = 0.8):
+  def generate_rock_beat(self, section_instance, track_number, seed, speed=0.5, strength=0.8):
     random.seed(seed)
 
     # track beat pattern that will be repeated throughout the section:
     pattern_track = []
 
     # how many times the pattern will be repeated
-    pattern_repeat = int(section_instance.length_beats / section_instance.beats_in_bar)
+    pattern_repeat = int(
+        section_instance.length_beats / section_instance.beats_in_bar)
 
-    hihat_cymbal = random.choice([NOTE_DRUM_HIHAT_CLOSED,NOTE_DRUM_HIHAT_PEDAL,NOTE_DRUM_CYMBAL_RIDE])
+    hihat_cymbal = random.choice(
+        [NOTE_DRUM_HIHAT_CLOSED, NOTE_DRUM_HIHAT_PEDAL, NOTE_DRUM_CYMBAL_RIDE])
 
     if speed < 0.2:
-      hihat_rythms = [2,4]
+      hihat_rythms = [2, 4]
     elif speed < 0.5:
       hihat_rythms = [2]
     elif speed < 0.8:
-      hihat_rythms = [1,2]
+      hihat_rythms = [1, 2]
     else:
       hihat_rythms = [1]
 
     hihat_rythm = random.choice(hihat_rythms)
 
-    for i in range(section_instance.beats_in_bar * 4):  # quarter-beat resolution
+    # quarter-beat resolution
+    for i in range(section_instance.beats_in_bar * 4):
       pattern_track.append([])
 
       # assign probabilities:
       bass_probability = (0.8 if i == 0 else 0.08) + speed * 0.6
-      snare_probability = (0.6 if (i + 4) % 8 == 0 else 0.03) + speed * 0.6
+      snare_probability = (
+          0.6 if (i + 4) % 8 == 0 else 0.03) + speed * 0.6
       hihat_probability = 0.99 if i % hihat_rythm == 0 else 0.02
 
       if i < 4:
         interchange_snare_and_bass = False
       else:
-        interchange_snare_and_bass = True if random.random() < 0.2 else False
+        interchange_snare_and_bass = True if random.random(
+        ) < 0.2 else False
 
       # generate the pattern:
       if random.random() < bass_probability:
-        pattern_track[-1].append(NOTE_DRUM_BASS if not interchange_snare_and_bass else NOTE_DRUM_SNARE)
+        pattern_track[-1].append(
+            NOTE_DRUM_BASS if not interchange_snare_and_bass else NOTE_DRUM_SNARE)
 
       if random.random() < snare_probability:
-        pattern_track[-1].append(NOTE_DRUM_SNARE if not interchange_snare_and_bass else NOTE_DRUM_BASS)
+        pattern_track[-1].append(
+            NOTE_DRUM_SNARE if not interchange_snare_and_bass else NOTE_DRUM_BASS)
 
       if random.random() < hihat_probability:
-        if random.random() < 0.98:                  # mostly hit the hihat but sometimes hit something else
+        # mostly hit the hihat but sometimes hit something else
+        if random.random() < 0.98:
           pattern_track[-1].append(hihat_cymbal)
         else:
-          pattern_track[-1].append(random.choice([NOTE_DRUM_CYMBAL_RIDE,NOTE_DRUM_CYMBAL_RIDE_BELL]))
+          pattern_track[-1].append(
+              random.choice([NOTE_DRUM_CYMBAL_RIDE, NOTE_DRUM_CYMBAL_RIDE_BELL]))
 
     # generate actual notes:
 
     for i in range(len(pattern_track)):
       for j in range(pattern_repeat):
         for note in pattern_track[i]:
-          if random.random() < 0.05:    # sometimes drop the note to make the pattern a bit different
+          # sometimes drop the note to make the pattern a bit
+          # different
+          if random.random() < 0.05:
             continue
 
-          section_instance.tracks[track_number].add_note(Note(j * section_instance.beats_in_bar + i / 4.0,0.1,note,int(strength * 128)))
+          section_instance.tracks[track_number].add_note(
+              Note(j * section_instance.beats_in_bar + i / 4.0, 0.1, note, int(strength * 128)))
 
     # add some cymbals:
 
     if strength >= 0.6:
       if random.random() < 0.8:
-        start = random.choice([0,1])
-        section_instance.tracks[track_number].add_note(Note(start,0.1,random.choice([NOTE_DRUM_CYMBAL_CRASH,NOTE_DRUM_CYMBAL_SPLASH]),80))
+        start = random.choice([0, 1])
+        section_instance.tracks[track_number].add_note(Note(
+            start, 0.1, random.choice([NOTE_DRUM_CYMBAL_CRASH, NOTE_DRUM_CYMBAL_SPLASH]), 80))
     elif strength >= 0.8:
       if random.random() < 0.99:
-        start = random.choice([0,1])
-        section_instance.tracks[track_number].add_note(Note(start,0.1,NOTE_DRUM_CYMBAL_CRASH,80))
+        start = random.choice([0, 1])
+        section_instance.tracks[track_number].add_note(
+            Note(start, 0.1, NOTE_DRUM_CYMBAL_CRASH, 80))
 
-  ## Evaluates a build-in function for random value generation of the
+  # Evaluates a build-in function for random value generation of the
   #  composer file language and returns the generated value.
   #
   #  @param function_string a string representing the function and its
@@ -437,10 +553,10 @@ class RandomGenerator:
   #  @return the generated value represented as a string (even if it's
   #          a number) or None if there was an error
 
-  def evaluate_function(self,function_string,seed):
+  def evaluate_function(self, function_string, seed):
     try:
       # remove the spaces
-      function_string = re.sub('\s*','',function_string)
+      function_string = re.sub('\s*', '', function_string)
       position = function_string.find("(")
       name = function_string[0:position]
       parameters = function_string[position + 1:-1].split(",")
@@ -448,13 +564,13 @@ class RandomGenerator:
       random.seed(seed)
 
       if name == "uniform":
-        return str(random.randrange(int(parameters[0]),int(parameters[1]) + 1))
+        return str(random.randrange(int(parameters[0]), int(parameters[1]) + 1))
       elif name == "values_uniform":
         return random.choice(parameters)
       elif name == "normal":
-        return str(int(random.normalvariate(int(parameters[0]),int(parameters[1]))))
+        return str(int(random.normalvariate(int(parameters[0]), int(parameters[1]))))
       elif name == "yes_no":
-        return "yes" if random.randrange(0,100) < int(parameters[0]) else "no"
+        return "yes" if random.randrange(0, 100) < int(parameters[0]) else "no"
       elif name == "values":
         calculate_last = False
 
@@ -466,7 +582,7 @@ class RandomGenerator:
         probabilities = []
         probability_sum = 0
 
-        for i in range(0,len(parameters),2):
+        for i in range(0, len(parameters), 2):
           values.append(parameters[i])
           probabilities.append(int(parameters[i + 1]))
           probability_sum += probabilities[-1]
@@ -475,10 +591,11 @@ class RandomGenerator:
           probabilities[-1] = 100 - probability_sum
           probability_sum += probabilities[-1]
 
-        if probabilities[-1] < 0 or probability_sum != 100: # bad values
+        # bad values
+        if probabilities[-1] < 0 or probability_sum != 100:
           return None
 
-        random_value = random.randrange(0,100)
+        random_value = random.randrange(0, 100)
 
         probability_sum = 0
         index = 0
@@ -493,10 +610,10 @@ class RandomGenerator:
         return values[index]
 
     except Exception:
-      print (traceback.format_exc())
+      print(traceback.format_exc())
       return None
 
-  ## Generates a composition structure (a sequence of section names) from
+  # Generates a composition structure (a sequence of section names) from
   #  composition structure string (a regular expression-like string, see
   #  the composition file format specification for details).
   #
@@ -510,22 +627,22 @@ class RandomGenerator:
   def generate_composition_structure(self, cs_string, seed):
     try:
       # remove extra spaces:
-      cs_string = re.sub('\s+',' ',cs_string).lstrip().rstrip()
-      cs_string = re.sub('\s*\(\s*',' ( ',cs_string)
-      cs_string = re.sub('\s*\)\s*',' ) ',cs_string)
-      cs_string = re.sub('\s*\{\s*',' { ',cs_string)
-      cs_string = re.sub('\s*\}\s*',' } ',cs_string)
-      cs_string = re.sub('\s*\[\s*',' [ ',cs_string)
-      cs_string = re.sub('\s*\]\s*',' ] ',cs_string)
+      cs_string = re.sub('\s+', ' ', cs_string).lstrip().rstrip()
+      cs_string = re.sub('\s*\(\s*', ' ( ', cs_string)
+      cs_string = re.sub('\s*\)\s*', ' ) ', cs_string)
+      cs_string = re.sub('\s*\{\s*', ' { ', cs_string)
+      cs_string = re.sub('\s*\}\s*', ' } ', cs_string)
+      cs_string = re.sub('\s*\[\s*', ' [ ', cs_string)
+      cs_string = re.sub('\s*\]\s*', ' ] ', cs_string)
       tokens = cs_string.split()
 
       random.seed(seed)
 
-      return self.__parse_composition_structure(tokens,seed)
+      return self.__parse_composition_structure(tokens, seed)
     except Exception:
       return None
 
-  ## Private function that recursively parses the composition structure
+  # Private function that recursively parses the composition structure
   #  string.
   #
   #  @param tokens list of string tokens representing the structure to
@@ -535,7 +652,7 @@ class RandomGenerator:
 
   def __parse_composition_structure(self, tokens, seed):
     def is_text(what):
-      return what not in ["(",")","[","]","{","}"]
+      return what not in ["(", ")", "[", "]", "{", "}"]
 
     square_brackets = False
     result = []
@@ -558,7 +675,8 @@ class RandomGenerator:
           if tokens[position] == "}":
             break
 
-        # TODO: use helper_string here to generate random number and repeat previous section
+        # TODO: use helper_string here to generate random number and
+        # repeat previous section
       else:                                   # ( or a section name
         item = tokens[position]
 
@@ -576,14 +694,15 @@ class RandomGenerator:
 
             position2 += 1
 
-          item = self.__parse_composition_structure(tokens[position + 1:position2],seed)
+          item = self.__parse_composition_structure(
+              tokens[position + 1:position2], seed)
 
           position = position2
 
         if square_brackets:
-            helper_list.append(item)
+          helper_list.append(item)
         else:
-            result.append(item)
+          result.append(item)
 
       position += 1
 
@@ -591,14 +710,14 @@ class RandomGenerator:
 
 #=======================================================================
 
-## Represents a list of key-value pairs. Each parameter is stored in
+# Represents a list of key-value pairs. Each parameter is stored in
 #  formt: name const1 value1 operator const2 value2.
 
 class ParameterList:
   OPERATOR_PLUS = 0
   OPERATOR_MINUS = 1
 
-  ## A class method that makes a parameter list with default values for
+  # A class method that makes a parameter list with default values for
   #  a section.
   #
   #  @return ParameterList object with default values initialised
@@ -606,16 +725,16 @@ class ParameterList:
   def make_default_parameter_list():
     result = ParameterList()
 
-    result.set_parameter("tempo",True,"uniform(90,120)")
-    result.set_parameter("signature",True,"values(4/4,90,3/4,10)")
-    result.set_parameter("instrument-piano",True,"no")
+    result.set_parameter("tempo", True, "uniform(90,120)")
+    result.set_parameter("signature", True, "values(4/4,90,3/4,10)")
+    result.set_parameter("instrument-piano", True, "no")
 
     return result
 
   def __init__(self):
     self._parameter_dict = {}
 
-  ## Gets the parameter.
+  # Gets the parameter.
   #
   #  @name name of the parameter to be returned (string)
   #  @return parameter as a list in format [const1 (bool), value1,
@@ -627,7 +746,7 @@ class ParameterList:
     except Exception:
       return None
 
-  ## Sets a parameter value.
+  # Sets a parameter value.
   #
   #  @param name parameter name (string)
   #  @param const1 whether value1 flag should be set to const (bool)
@@ -638,7 +757,7 @@ class ParameterList:
   #  @param const2 whether value2 flag should be set to const (bool)
   #  @param value2 second value (string or integer or None)
 
-  def set_parameter(self, name, const1 = False, value1 = "inherit", operator = None, const2 = False, value2 = None):
+  def set_parameter(self, name, const1=False, value1="inherit", operator=None, const2=False, value2=None):
     self._parameter_dict[name] = [const1, value1, operator, const2, value2]
 
   def __str__(self):
@@ -665,25 +784,26 @@ class ParameterList:
 
 #=======================================================================
 
-## Represents a section, or more accurately a section definition
+# Represents a section, or more accurately a section definition
 #  (not a section instance), that can be loaded from the compositor
 #  file.
 
 class Section:
+
   def init_attributes(self):
-    ## section name
+    # section name
     self.name = ""
-    ## name of the parent section in inheritance context, None = no parent
+    # name of the parent section in inheritance context, None = no parent
     self.parent_name = None
-    ## error explanation string, None = no error
+    # error explanation string, None = no error
     self._error_string = None
-    ## stores parameter values
+    # stores parameter values
     self.parameters = ParameterList()
 
   def __init__(self):
     self.init_attributes()
 
-  ## Gets an error explanation string that occured during the section
+  # Gets an error explanation string that occured during the section
   #  loading from string.
   #
   #  @return error explanation string or None if there was no error
@@ -691,12 +811,12 @@ class Section:
   def get_error_string(self):
     return self._error_string
 
-  ## Initialises the section from given string (for the string format
+  # Initialises the section from given string (for the string format
   #  see the composer file format reference).
   #
   #  @string section_string to read the section from
 
-  def load_from_string(self,section_string):
+  def load_from_string(self, section_string):
     lines = section_string.split("\n")
 
     pair = lines[0].split(":")
@@ -753,9 +873,10 @@ class Section:
 
         value2 = value_split[position]
       except Exception:
-         pass
+        pass
 
-      self.parameters.set_parameter(pair[0],const1,value1,operator,const2,value2)
+      self.parameters.set_parameter(
+          pair[0], const1, value1, operator, const2, value2)
 
     # if we get here, there was no '{'
     self._error_string = "'}' expected"
@@ -769,27 +890,28 @@ class Section:
 
 #=======================================================================
 
-## Represents a section instance, i.e. a concrete section with its own
+# Represents a section instance, i.e. a concrete section with its own
 #  parameter values and music pattern generated
 
 class SectionInstance:
+
   def init_attributes(self):
-    ## a reference to Section object of which this section is an
+    # a reference to Section object of which this section is an
     #  instance
     self.definition = None
-    ## holds the section tracks with musical notes
+    # holds the section tracks with musical notes
     self.tracks = []
-    ## section length in beats
+    # section length in beats
     self.length_beats = 4
-    ## how many beats are in one bar
+    # how many beats are in one bar
     self.beats_in_bar = 4
-    ## stores parameter values
+    # stores parameter values
     self.parameters = ParameterList()
-    ## stores meta events for the section such as tempo change, it is
+    # stores meta events for the section such as tempo change, it is
     #  a list of tuples (time in beats, event type, parameter)
     self.meta_events = []
 
-  ## Converts a beat offset, i.e. a float type time in beats, to real time
+  # Converts a beat offset, i.e. a float type time in beats, to real time
   #  in seconds, taking the tempo changes of the section into account.
   #
   #  @param beat_offset input value
@@ -810,7 +932,8 @@ class SectionInstance:
       event = self.meta_events[current_event_index]
       current_event_index += 1
 
-      if event[1] != EVENT_TEMPO_CHANGE:    # skip the events that aren't tempo change
+      # skip the events that aren't tempo change
+      if event[1] != EVENT_TEMPO_CHANGE:
         continue
 
       current_beat_offset = event[0]
@@ -818,14 +941,17 @@ class SectionInstance:
       if current_beat_offset >= beat_offset:
         break
 
-      accumulated_time += (current_beat_offset - previous_beat_offset) * 60.0 / current_tempo
+      accumulated_time += (current_beat_offset -
+                           previous_beat_offset) * 60.0 / current_tempo
 
       current_tempo = event[2]
       previous_beat_offset = current_beat_offset
 
-    # now there is only a section between the last event and given beat offset
+    # now there is only a section between the last event and given beat
+    # offset
 
-    accumulated_time += (beat_offset - previous_beat_offset) * 60.0 / current_tempo
+    accumulated_time += (beat_offset -
+                         previous_beat_offset) * 60.0 / current_tempo
 
     return accumulated_time
 
@@ -838,11 +964,21 @@ class SectionInstance:
   #  @param event_type event type (int, see constants)
   #  @param parameter parameter of the event such as the tempo value
 
-  def add_meta_event(self,time,event_type,parameter):
-    self.meta_events.append((time,event_type,parameter))
+  def add_meta_event(self, time, event_type, parameter):
+    self.meta_events.append((time, event_type, parameter))
 
-  ## Adds given track to the section.
-  def add_track(self,track):
+  ## Removes given track.
+  #
+  #  @param track track to be removed (SectionTrack object)
+
+  def remove_track(self, track):
+    for i in range(len(self.tracks)):
+      if self.tracks[i] is track:
+        del self.tracks[i]
+        return
+
+  # Adds given track to the section.
+  def add_track(self, track):
     track.length_beats = self.length_beats
     self.tracks.append(track)
 
@@ -866,10 +1002,10 @@ class SectionInstance:
 
 #=======================================================================
 
-## Represents a musical note.
+# Represents a musical note.
 
 class Note:
-  ## Class method, gets a closest note value in given key to a given
+  # Class method, gets a closest note value in given key to a given
   #  value.
   #
   #  @param value note value
@@ -887,23 +1023,23 @@ class Note:
     return 0
 
   def init_attributes(self):
-    ## on what time the note starts, the value is in beats (float)
+    # on what time the note starts, the value is in beats (float)
     self.start = 0.0
-    ## duration of the note in beats (float)
+    # duration of the note in beats (float)
     self.length = 0.25
-    ## note "strength", integer 0 - 127
+    # note "strength", integer 0 - 127
     self.velocity = 100
-    ## MIDI note code (C3 = 60)
+    # MIDI note code (C3 = 60)
     self.note = 60
 
-  ## Transposes the note respecting given key.
+  # Transposes the note respecting given key.
   #
   #  @param key key (the list of note values, see constants), the note
   #         must be in this key, otherwise nothing happens
   #  @param offset how many notes the note should be transposed,
   #         can be positive or negative integer
 
-  def transpose(self,key,offset):
+  def transpose(self, key, offset):
     increment_by = 1 if offset >= 0 else -1
     offset = abs(offset)
 
@@ -953,24 +1089,25 @@ class Note:
 
 #=======================================================================
 
-## Represents a track used by a section. The track holds the music
+# Represents a track used by a section. The track holds the music
 #  patern (notes) and an information about it such as its instrument.
 
 class SectionTrack:
+
   def init_attributes(self):
-    ## track instrument
+    # track instrument
     self.instrument = INSTRUMENT_PIANO
-    ## track length in beats
+    # track length in beats
     self.length_beats = 4
-    ## number of beats in a bar
+    # number of beats in a bar
     self.signature = 4
-    ## list of Note objects representing a musical pattern of the track
+    # list of Note objects representing a musical pattern of the track
     self.notes = []
 
   def __init__(self):
     self.init_attributes()
 
-  ## Returns a note at given time.
+  # Returns a note at given time.
   #
   #  @param time time (in beats, float)
   #  @return list of note values (not Note objects) at given time (may be empty)
@@ -984,13 +1121,13 @@ class SectionTrack:
 
     return result
 
-  ## Sorts the notes list so they are in order in which the start
+  # Sorts the notes list so they are in order in which the start
   #  playing.
 
   def sort_notes(self):
-    self.notes.sort(key = lambda note: note.start)
+    self.notes.sort(key=lambda note: note.start)
 
-  def add_note(self,note):
+  def add_note(self, note):
     self.notes.append(note)
     self.sort_notes()
 
@@ -1023,17 +1160,19 @@ class SectionTrack:
 
 #=======================================================================
 
-## Represents a composition composed of ordered section instances.
+# Represents a composition composed of ordered section instances.
+
 
 class Composition:
+
   def init_attributes(self):
-    ## a list of section instances that make up the composition
+    # a list of section instances that make up the composition
     self.section_instances = []
 
   def __init__(self):
     self.init_attributes()
 
-  def add_section_instance(self,section_instance):
+  def add_section_instance(self, section_instance):
     self.section_instances.append(section_instance)
 
   def __str__(self):
@@ -1044,7 +1183,7 @@ class Composition:
 
     return result
 
-  ## Gets number of tracks that will be needed for the MIDI file
+  # Gets number of tracks that will be needed for the MIDI file
   #  (this is equal to number of instruments in the composition plus
   #  one for a special drum channel).
   #
@@ -1059,9 +1198,9 @@ class Composition:
 
     return len(instrument_set) + 1
 
-  ## Private function, maps track numbers to channels.
+  # Private function, maps track numbers to channels.
 
-  def __track_number_to_channel(self,track_number):
+  def __track_number_to_channel(self, track_number):
     if track_number == 0:   # drums, channel 10 by MIDI specification
       return 9    # = 10 - 1
     elif track_number >= 10:
@@ -1069,20 +1208,22 @@ class Composition:
 
     return track_number - 1
 
-  def save_as_midi(self,filename):
-    # it seems the midiutil library doesn't support time signature event so far :/
+  def save_as_midi(self, filename):
+    # it seems the midiutil library doesn't support time signature event so
+    # far :/
 
     number_of_tracks = self.number_of_tracks()
     midi = MIDIFile(number_of_tracks)
     section_offset = 0   # current section offset in beats
-    track_instruments = [None for i in range(number_of_tracks)]         # holds track instruments
+    # holds track instruments
+    track_instruments = [None for i in range(number_of_tracks)]
 
     # process all section instances:
     for section_instance in self.section_instances:
       for event in section_instance.meta_events:      # write events
         if event[1] == EVENT_TEMPO_CHANGE:
           for t in range(number_of_tracks):
-            midi.addTempo(t,section_offset + event[0],event[2])
+            midi.addTempo(t, section_offset + event[0], event[2])
 
       for section_track in section_instance.tracks:
         track_number = 1   # which midi track to write the notes to
@@ -1090,12 +1231,18 @@ class Composition:
         if section_track.instrument == INSTRUMENT_ROCK_DRUMS:
           track_number = 0         # 0 is reserved for drums
         else:
-          while track_number < number_of_tracks:      # find the appropriate track
-            if track_instruments[track_number] == None:   # empty track - take it
-              track_instruments[track_number] = section_track.instrument  # set the track to given instrument
-              midi.addProgramChange(track_number,self.__track_number_to_channel(track_number),0,instrument_to_midi(section_track.instrument))
+          # find the appropriate track
+          while track_number < number_of_tracks:
+            # empty track - take it
+            if track_instruments[track_number] == None:
+              # set the track to given instrument
+              track_instruments[
+                  track_number] = section_track.instrument
+              midi.addProgramChange(track_number, self.__track_number_to_channel(
+                  track_number), 0, instrument_to_midi(section_track.instrument))
               break
-            elif track_instruments[track_number] == section_track.instrument:  # appropriate track (the same instrument) - take it
+            # appropriate track (the same instrument) - take it
+            elif track_instruments[track_number] == section_track.instrument:
               break
 
             track_number += 1
@@ -1105,11 +1252,12 @@ class Composition:
         track_channel = self.__track_number_to_channel(track_number)
 
         for note in section_track.notes:
-          midi.addNote(track_number,track_channel,note.note,section_offset + note.start,note.length,note.velocity)
+          midi.addNote(track_number, track_channel, note.note,
+                       section_offset + note.start, note.length, note.velocity)
 
       section_offset += section_instance.length_beats
 
-    midi_file = open(filename,'wb')
+    midi_file = open(filename, 'wb')
     midi.writeFile(midi_file)
     midi_file.close()
 
@@ -1117,70 +1265,40 @@ class Composition:
 
 #=======================================================================
 
-#instance = SectionInstance()
-#track = SectionTrack()
-#track2 = SectionTrack()
-#track2.instrument = INSTRUMENT_ROCK_DRUMS
 
-#track2.add_note(Note(0.5,1,120,100))
-#track2.add_note(Note(2.0,1,100,50))
+def test():
+  r = RandomGenerator()
+  c = Composition()
+  s = SectionInstance()
+  s2 = SectionInstance()
 
-#track.add_note(Note(1,0.6,120,100))
-#track.add_note(Note(3.0,0.25,100,50))
+  t1 = SectionTrack()
+  t2 = SectionTrack()
+  t3 = SectionTrack()
+  t4 = SectionTrack()
 
-#instance.add_track(track)
-#instance.add_track(track2)
-#print(instance)
+  t1.instrument = INSTRUMENT_EBASS
+  t2.instrument = INSTRUMENT_PIANO
+  t3.instrument = INSTRUMENT_STRINGS
+  t4.instrument = INSTRUMENT_ROCK_DRUMS
 
-r = RandomGenerator()
-#print(r.generate_composition_structure(" aaaa [bbb ccccc dddddddd (XXXXXX YYYYYYY) ]{uniform(2,3)} (xxxx [(fufufu sesese) (popopo mumumu)]) eeeeeee{ uniform(2,3) } ffffff ",12315))
-#r.generate_composition_structure("    rock (   (rock_chorus   | pop_chorus)[  uniform(2,3) ]  |   rock_bridge[10])   (rock_chorus(pop_chorus) ) ",12314)
+  s.length_beats = 30
 
-c = Composition()
+  s.add_track(t1)
+  s.add_track(t2)
+  s.add_track(t3)
+  s.add_track(t4)
 
-s = SectionInstance()
-s2 = SectionInstance()
+  seed = 7000
 
-t1 = SectionTrack()
-t2 = SectionTrack()
-t3 = SectionTrack()
-t4 = SectionTrack()
+  r.generate_rock_beat(s, 3, seed, 0.1, 0.7)
+  r.generate_chords(s, 2, KEY_C_NOTES, seed)
+  r.generate_harmonies(
+      s, 1, 2, KEY_C_NOTES, seed, harmony_factor=0.99, speed=0.7, fullness_factor=0.9)
+  r.generate_bass(s, 0, 2, KEY_C_NOTES, seed)
 
-t1.instrument = INSTRUMENT_PIANO
-t2.instrument = INSTRUMENT_PIANO
-t3.instrument = INSTRUMENT_STRINGS
-t4.instrument = INSTRUMENT_ROCK_DRUMS
+  s.add_meta_event(0.0, EVENT_TEMPO_CHANGE, 60)
 
-s.length_beats = 30
+  c.add_section_instance(s)
 
-s.add_track(t1)
-s.add_track(t2)
-s.add_track(t3)
-s.add_track(t4)
-
-seed = 5000
-
-r.generate_melody(s,0,KEY_C_NOTES,seed,offset_factor = 0.3)
-r.generate_rock_beat(s,3,seed,0.1,0.7)
-r.generate_chords(s,2,KEY_C_NOTES,seed)
-r.generate_harmonies(s,1,2,KEY_C_NOTES,seed,harmony_factor = 0.99,speed = 0.7,fullness_factor = 0.9)
-
-t5 = SectionTrack()
-t6 = SectionTrack()
-
-t5.instrument = INSTRUMENT_EBASS
-t6.instrument = INSTRUMENT_EBASS
-
-s2.add_track(t5)
-s2.add_track(t6)
-
-s.add_meta_event(0.0,EVENT_TEMPO_CHANGE,60)
-s2.add_meta_event(1.0,EVENT_TEMPO_CHANGE,120)
-
-c.add_section_instance(s)
-c.add_section_instance(s2)
-
-#print(c)
-#print(c.number_of_tracks())
-
-c.save_as_midi("test.mid")
+  c.save_as_midi("test.mid")

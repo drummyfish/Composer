@@ -6,7 +6,7 @@ except ImportError:
   from tkinter import *
 
 import composer
-
+import random
 
 class Gui:
 
@@ -47,7 +47,7 @@ class Gui:
     self.var_bass_speed = BooleanVar(master)
     self.var_bass_strength = BooleanVar(master)
 
-    instrument_options = ["piano", "guitar", "strings", "brass"]
+    self.instrument_options = ["piano", "guitar", "strings", "brass"]
 
     # default values:
     self.var_drums.set(True)
@@ -83,21 +83,21 @@ class Gui:
         row=2, column=general_column + 1, sticky=W)
     Label(frame, text="key").grid(row=3, column=general_column, sticky=W)
 
-    key_options = [
+    self.key_options = [
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-    self.var_key.set(key_options[0])
-    OptionMenu(frame, self.var_key, key_options[0],
-               key_options[1], key_options[2], key_options[3],
-               key_options[4], key_options[5], key_options[6],
-               key_options[7], key_options[8], key_options[9],
-               key_options[10], key_options[11]).grid(row=3, column=1, sticky=W)
+    self.var_key.set(self.key_options[0])
+    OptionMenu(frame, self.var_key, self.key_options[0],
+               self.key_options[1], self.key_options[2], self.key_options[3],
+               self.key_options[4], self.key_options[5], self.key_options[6],
+               self.key_options[7], self.key_options[8], self.key_options[9],
+               self.key_options[10], self.key_options[11]).grid(row=3, column=1, sticky=W)
 
     Label(frame, text="signature").grid(
         row=4, column=general_column, sticky=W)
 
-    signature_options = ["4/4", "3/4"]
-    self.var_signature.set(signature_options[0])
-    OptionMenu(frame, self.var_signature, signature_options[0], signature_options[
+    self.signature_options = ["4/4", "3/4"]
+    self.var_signature.set(self.signature_options[0])
+    OptionMenu(frame, self.var_signature, self.signature_options[0], self.signature_options[
                1]).grid(row=4, column=general_column + 1, sticky=W)
 
     Label(frame, text="length (beats)").grid(
@@ -156,11 +156,11 @@ class Gui:
         row=5, column=melody_column + 1, sticky=W)
 
     Label(frame, text="instrument").grid(
-        row=6, column=melody_column, sticky=W)
+        row=7, column=melody_column, sticky=W)
 
-    self.var_melody_instrument.set(instrument_options[0])
-    OptionMenu(frame, self.var_melody_instrument, instrument_options[0], instrument_options[
-               1], instrument_options[2], instrument_options[3]).grid(row=6, column=melody_column + 1, sticky=W)
+    self.var_melody_instrument.set(self.instrument_options[0])
+    OptionMenu(frame, self.var_melody_instrument, self.instrument_options[0], self.instrument_options[
+               1], self.instrument_options[2], self.instrument_options[3]).grid(row=7, column=melody_column + 1, sticky=W)
 
     # chords column:
     chords_column = 6
@@ -187,11 +187,11 @@ class Gui:
         row=5, column=chords_column + 1, sticky=W)
 
     Label(frame, text="instrument").grid(
-        row=6, column=chords_column, sticky=W)
+        row=7, column=chords_column, sticky=W)
 
-    self.var_chords_instrument.set(instrument_options[2])
-    OptionMenu(frame, self.var_chords_instrument, instrument_options[0], instrument_options[
-               1], instrument_options[2], instrument_options[3]).grid(row=6, column=chords_column + 1, sticky=W)
+    self.var_chords_instrument.set(self.instrument_options[2])
+    OptionMenu(frame, self.var_chords_instrument, self.instrument_options[0], self.instrument_options[
+               1], self.instrument_options[2], self.instrument_options[3]).grid(row=7, column=chords_column + 1, sticky=W)
 
     # harmony column:
     harmony_column = 8
@@ -214,16 +214,21 @@ class Gui:
         row=4, column=harmony_column + 1, sticky=W)
 
     Label(frame, text="harmony range").grid(
-        row=4, column=harmony_column, sticky=W)
+        row=5, column=harmony_column, sticky=W)
     Scale(frame, from_=0, to=100, orient=HORIZONTAL, var=self.var_harmony_range).grid(
-        row=4, column=harmony_column + 1, sticky=W)
+        row=5, column=harmony_column + 1, sticky=W)
+
+    Label(frame, text="harmony factor").grid(
+        row=6, column=harmony_column, sticky=W)
+    Scale(frame, from_=0, to=100, orient=HORIZONTAL, var=self.var_harmony_harmony_factor).grid(
+        row=6, column=harmony_column + 1, sticky=W)
 
     Label(frame, text="instrument").grid(
-        row=6, column=chords_column, sticky=W)
+        row=7, column=chords_column, sticky=W)
 
-    self.var_harmony_instrument.set(instrument_options[3])
-    OptionMenu(frame, self.var_harmony_instrument, instrument_options[0], instrument_options[
-               1], instrument_options[2], instrument_options[3]).grid(row=6, column=harmony_column + 1, sticky=W)
+    self.var_harmony_instrument.set(self.instrument_options[3])
+    OptionMenu(frame, self.var_harmony_instrument, self.instrument_options[0], self.instrument_options[
+               1], self.instrument_options[2], self.instrument_options[3]).grid(row=7, column=harmony_column + 1, sticky=W)
 
     # bass column:
     bass_column = 10
@@ -241,6 +246,98 @@ class Gui:
     Scale(frame, from_=0, to=100, orient=HORIZONTAL, var=self.var_bass_strength).grid(
         row=3, column=bass_column + 1, sticky=W)
 
+    # create the MIDI image:
+
+    self.midi_image_size = (800,160)
+    self.midi_image = PhotoImage(width=self.midi_image_size[0], height=self.midi_image_size[1])
+    self.canvas = Canvas(frame, width=self.midi_image_size[0], height=self.midi_image_size[1], bg="#000000")
+    self.canvas.grid(row=8, column=1, columnspan=6)
+    self.canvas.create_image((self.midi_image_size[0]/2 + 2, self.midi_image_size[1]/2 + 2), image=self.midi_image, state="normal")
+
+    self.__redraw_midi_image(None)
+
+    Label(frame, text="Miloslav 'tastyfish' Ciz, 2015").grid(
+        row=9, column=1, sticky=W)
+
+    Button(frame, text="randomize", command=self.randomize).grid(
+        row=9, column=0, sticky=W)
+
+  def fill(self, image, color):
+    r,g,b = color
+    width = image.width()
+    height = image.height()
+    hexcode = "#%02x%02x%02x" % (r,g,b)
+    horizontal_line = "{" + " ".join([hexcode]*width) + "}"
+    image.put(" ".join([horizontal_line]*height))
+
+  def randomize(self):
+    self.var_drums.set(random.random() < 0.5)
+    self.var_melody.set(random.random() < 0.5)
+    self.var_harmony.set(random.random() < 0.5)
+    self.var_chords.set(random.random() < 0.5)
+    self.var_bass.set(random.random() < 0.5)
+    self.var_length.set(random.randint(10,60))
+    self.var_tempo.set(random.randint(80,140))
+    self.var_drums_speed.set(random.randint(0,100))
+    self.var_drums_strength.set(random.randint(30,100))
+    self.var_melody_speed.set(random.randint(0,100))
+    self.var_melody_range.set(random.randint(0,100))
+    self.var_melody_base_note.set(random.randint(0,100))
+    self.var_melody_disharmonies.set(random.randint(0,100))
+    self.var_chords_speed.set(random.randint(0,100))
+    self.var_chords_fullness.set(random.randint(0,100))
+    self.var_chords_pattern_length.set(random.randint(2,6))
+    self.var_chords_seventh_factor.set(random.randint(0,100))
+    self.var_harmony_speed.set(random.randint(0,100))
+    self.var_harmony_range.set(random.randint(0,100))
+    self.var_harmony_fullness.set(random.randint(0,100))
+    self.var_harmony_base_note.set(random.randint(0,100))
+    self.var_harmony_harmony_factor.set(random.randint(70,100))
+    self.var_bass_strength.set(random.randint(0,100))
+    self.var_bass_speed.set(random.randint(0,100))
+    self.var_seed.set(random.randint(0,65535))
+
+    self.var_key.set(random.choice(self.key_options))
+    self.var_signature.set(random.choice(self.signature_options))
+    self.var_melody_instrument.set(random.choice(self.instrument_options))
+    self.var_chords_instrument.set(random.choice(self.instrument_options))
+    self.var_harmony_instrument.set(random.choice(self.instrument_options))
+
+  def __redraw_midi_image(self, section_instance):
+    self.fill(self.midi_image,(255,255,255))
+
+    if section_instance == None:
+      return
+
+    colors = ["#E31717", "#27D613", "#3160EB", "#EBDB31", "#DF61ED"]
+    color_index = 0
+
+    next_bar = section_instance.beats_in_bar
+
+    for i in range(self.midi_image_size[0]):
+      position = i / float(self.midi_image_size[0] - 1) * section_instance.length_beats
+
+      if position >= next_bar:
+        next_bar += section_instance.beats_in_bar
+
+        for j in range(self.midi_image_size[1]):
+          self.midi_image.put("#C9C9C9", (i,j))
+
+      color_index = 0
+
+      for track in section_instance.tracks:
+        color = colors[color_index]
+
+        color_index = (color_index + 1) % len(colors)
+
+        notes = track.notes_at(position)
+
+        for note in notes:
+          y = self.midi_image_size[1] - note
+
+          if y >= 0 and y < self.midi_image_size[1]:
+            self.midi_image.put(color, (i,y))
+
   def __string_to_instrument(self, instrument_string):
     if instrument_string == "guitar":
       return composer.INSTRUMENT_GUITAR
@@ -256,7 +353,7 @@ class Gui:
     composition = composer.Composition()
     section_instance = composer.SectionInstance()
 
-    section_instance.add_meta_event(0,composer.EVENT_TEMPO_CHANGE,self.var_tempo.get())
+    section_instance.add_meta_event(0, composer.EVENT_TEMPO_CHANGE, self.var_tempo.get())
 
     if self.var_signature.get() == "3/4":
       section_instance.beats_in_bar = 3
@@ -284,19 +381,39 @@ class Gui:
 
     section_instance.length_beats = self.var_length.get()
 
-    if self.var_key.get == "C":
+    if self.var_key.get() == "C":
       key = composer.KEY_C_NOTES
+    elif self.var_key.get() == "C#":
+      key = composer.KEY_DB_NOTES
+    elif self.var_key.get() == "D":
+      key = composer.KEY_D_NOTES
+    elif self.var_key.get() == "E":
+      key = composer.KEY_E_NOTES
+    elif self.var_key.get() == "F":
+      key = composer.KEY_F_NOTES
+    elif self.var_key.get() == "F#":
+      key = composer.KEY_GB_NOTES
+    elif self.var_key.get() == "G":
+      key = composer.KEY_G_NOTES
+    elif self.var_key.get() == "G#":
+      key = composer.KEY_AB_NOTES
+    elif self.var_key.get() == "A":
+      key = composer.KEY_A_NOTES
+    elif self.var_key.get() == "A#":
+      key = composer.KEY_BB_NOTES
+    elif self.var_key.get() == "B":
+      key = composer.KEY_B_NOTES
     else:
       key = composer.KEY_C_NOTES
 
     generator.generate_rock_beat(section_instance, 0, self.var_seed.get(
-      ), self.var_drums_speed.get() / 100.0, self.var_drums_strength.get() / 100.0)
+    ), self.var_drums_speed.get() / 100.0, self.var_drums_strength.get() / 100.0)
     generator.generate_chords(section_instance, 1, key, self.var_seed.get(), self.var_chords_pattern_length.get(
-      ), self.var_chords_seventh_factor.get() / 100.0, self.var_chords_fullness.get() / 100.0, self.var_chords_speed.get() / 100.0)
+    ), self.var_chords_seventh_factor.get() / 100.0, self.var_chords_fullness.get() / 100.0, self.var_chords_speed.get() / 100.0)
     generator.generate_melody(section_instance, 2, key, self.var_seed.get(), self.var_melody_base_note.get(
-      ), self.var_melody_range.get() / 100.0, self.var_melody_speed.get() / 100.0, self.var_melody_disharmonies.get() / 100.0)
+    ), self.var_melody_range.get() / 100.0, self.var_melody_speed.get() / 100.0, self.var_melody_disharmonies.get() / 100.0)
     generator.generate_harmonies(section_instance, 3, 1, key, self.var_seed.get(), self.var_harmony_base_note.get(), self.var_harmony_harmony_factor.get(
-      ) / 100.0, self.var_harmony_range.get() / 100.0, self.var_harmony_speed.get() / 100.0, self.var_harmony_fullness.get() / 100.0)
+    ) / 100.0, self.var_harmony_range.get() / 100.0, self.var_harmony_speed.get() / 100.0, self.var_harmony_fullness.get() / 100.0)
     generator.generate_bass(section_instance, 4, 1, key, self.var_seed.get(), self.var_bass_speed.get() / 100.0, self.var_bass_strength.get() / 100.0)
 
     if not self.var_drums.get():
@@ -317,6 +434,8 @@ class Gui:
     composition.add_section_instance(section_instance)
 
     composition.save_as_midi(self.text_filename.get("1.0", END)[:-1])
+
+    self.__redraw_midi_image(section_instance)
 
 root = Tk()
 app = Gui(root)

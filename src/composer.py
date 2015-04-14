@@ -221,7 +221,7 @@ class RandomGenerator:
         note_value = Note.closest_note_value(
             pattern[i], possible_notes)
 
-        if i != 0 and section_instance.tracks[track_number].notes[-1].note == note_value:
+        if i != 0 and len(section_instance.tracks[track_number].notes) > 0 and section_instance.tracks[track_number].notes[-1].note == note_value:
           section_instance.tracks[
               track_number].notes[-1].length += note_length
           continue
@@ -1057,6 +1057,12 @@ class Note:
     self.start = start
     self.length = length
     self.velocity = velocity
+
+    if note > 255:
+      note = 255
+    elif note < 0:
+      note = 0
+
     self.note = note
 
   def __str__(self):
